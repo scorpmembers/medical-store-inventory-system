@@ -1,3 +1,7 @@
+# medical-store-inventory-system
+
+A web-based Medical Store Inventory System built using React.js, Java Spring Boot, and MySQL to manage medicines, stock, purchases, sales, expiry alerts, and reports efficiently.
+
 # Medical Store Inventory System (MedStore IMS)
 
 A clean, modern, and professional web-based pharmacy management and inventory system frontend built for college major project demonstrations.
@@ -5,8 +9,9 @@ A clean, modern, and professional web-based pharmacy management and inventory sy
 ---
 
 ## 🚀 Technology Stack
+
 - **Frontend Library:** React.js (v18)
-- **Language:** JavaScript (ES6+, JSX) — *No TypeScript*
+- **Language:** JavaScript (ES6+, JSX) — _No TypeScript_
 - **Styling:** Tailwind CSS (v3)
 - **Icons:** Lucide React
 - **Build Tool / Dev Server:** Vite
@@ -17,6 +22,7 @@ A clean, modern, and professional web-based pharmacy management and inventory sy
 ## 🩺 System Features & Pages
 
 ### 1. Demo Login Page (`src/pages/LoginPage.jsx`)
+
 - Clean pharmacy staff login interface.
 - One-click demo login buttons:
   - **Pharmacist Demo:** `pharmacist@medstore.com`
@@ -24,6 +30,7 @@ A clean, modern, and professional web-based pharmacy management and inventory sy
 - Session state persisted to `localStorage` with a Logout button in the sidebar.
 
 ### 2. Dashboard (`src/pages/DashboardPage.jsx`)
+
 - **Key Performance Cards (KPIs):**
   - Total registered medicines count.
   - Total units in stock across all batches.
@@ -36,6 +43,7 @@ A clean, modern, and professional web-based pharmacy management and inventory sy
 - **Recent Sales Activity Table:** Latest customer transactions with quick receipt view.
 
 ### 3. Medicines Catalog (`src/pages/MedicinesPage.jsx`)
+
 - Comprehensive table displaying:
   - Medicine brand name, generic formulation, dosage form, manufacturer, ID.
   - Storage rack location (e.g., `Rack A-1`, `Rack B-2`).
@@ -49,6 +57,7 @@ A clean, modern, and professional web-based pharmacy management and inventory sy
 - **Edit & Delete Actions:** Modify medicine details or remove items.
 
 ### 4. Batch Inventory & Expiry Surveillance (`src/pages/InventoryPage.jsx`)
+
 - Batch-wise inventory table showing:
   - Batch number, medicine name, distributor.
   - Current physical quantity on shelf.
@@ -59,6 +68,7 @@ A clean, modern, and professional web-based pharmacy management and inventory sy
 - **Add Inward Batch Modal:** Directly add new stock lots to existing medicines.
 
 ### 5. Point of Sale (POS) & Billing (`src/pages/SalesPage.jsx`)
+
 - Interactive, counter-friendly retail billing form:
   - Customer name, mobile phone number, and prescribing doctor.
   - Medicine selector and batch selector with live stock indicators.
@@ -72,18 +82,21 @@ A clean, modern, and professional web-based pharmacy management and inventory sy
 - **Sales History Audit Log:** Search past invoices, customer details, and reprint receipts.
 
 ### 6. Purchases & Stock Inward (`src/pages/PurchasesPage.jsx`)
+
 - Record inward medicine consignments received from distributors.
 - Select supplier, select medicine, enter batch lot, quantity, purchase price, MRP, and expiry date.
 - **Automatic Stock Replenishment:** Saving a purchase instantly adds or increments batch inventory in the system.
 - Inward purchase register with invoice numbers, supplier names, unit rates, and total costs.
 
 ### 7. Suppliers Directory (`src/pages/SuppliersPage.jsx`)
-- Registered pharmaceutical distributors (e.g., *Apex Health Logistics*, *Sun BioCare*, *MedVantage*).
+
+- Registered pharmaceutical distributors (e.g., _Apex Health Logistics_, _Sun BioCare_, _MedVantage_).
 - Contact person, phone number, email, GSTIN, and physical warehouse address.
 - Add new supplier, edit supplier details, and delete entries.
 - Displays historical inward purchase count per supplier.
 
 ### 8. Reports & Analytics (`src/pages/ReportsPage.jsx`)
+
 - Financial KPI summaries:
   - Gross sales turnover.
   - Total inventory valuation at cost vs. at retail MRP.
@@ -140,10 +153,12 @@ medical-store-inventory-system/
 ## 🛠️ How to Run Locally
 
 ### Prerequisites
+
 - Node.js (version 18 or newer)
 - npm (version 9 or newer)
 
 ### Installation & Startup
+
 1. Open a terminal in the project directory:
    ```bash
    cd medical-store-inventory-system
@@ -166,12 +181,13 @@ medical-store-inventory-system/
 ## 🧪 College Project Viva & Demo Highlights
 
 When presenting this project to your professor or mentor, you can demonstrate these key business logic features:
+
 1. **Expiry Block Simulation:**
    - Go to **Point of Sale (Sales Page)**.
-   - Select *Augmentin 625 Duo*. Notice that Batch `#AUG-71A` is marked `[EXPIRED - CANNOT SELL]` and is disabled.
+   - Select _Augmentin 625 Duo_. Notice that Batch `#AUG-71A` is marked `[EXPIRED - CANNOT SELL]` and is disabled.
    - Show how the system prevents pharmacists from dispensing expired medication to patients.
 2. **Real-Time Stock Deduction:**
-   - Look at the available units for *Dolo 650mg* (Batch `#DL-24A1`).
+   - Look at the available units for _Dolo 650mg_ (Batch `#DL-24A1`).
    - Bill 5 units to a customer and complete the sale.
    - Show that stock immediately decreases by 5 units across the Dashboard, Medicines, and Inventory pages.
 3. **Inward Stock Replenishment:**
