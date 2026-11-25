@@ -25,6 +25,7 @@ export default function MedicinesPage({ setActivePage }) {
     addMedicine,
     updateMedicine,
     deleteMedicine,
+    isAdmin,
   } = useStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -182,13 +183,19 @@ export default function MedicinesPage({ setActivePage }) {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAddModal}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-lg transition-colors shadow-xs self-start md:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Medicine</span>
-        </button>
+        {isAdmin ? (
+          <button
+            onClick={handleOpenAddModal}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-lg transition-colors shadow-xs self-start md:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Medicine</span>
+          </button>
+        ) : (
+          <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+            Catalog Access: <strong>Search & Dispense Mode</strong>
+          </span>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -345,22 +352,32 @@ export default function MedicinesPage({ setActivePage }) {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                        {isAdmin ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditModal(med)}
+                              className="p-1.5 text-slate-500 hover:text-teal-700 hover:bg-teal-50 rounded transition-colors"
+                              title="Edit Medicine"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDeletingMedicine(med)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                              title="Delete Medicine"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => handleOpenEditModal(med)}
-                            className="p-1.5 text-slate-500 hover:text-teal-700 hover:bg-teal-50 rounded transition-colors"
-                            title="Edit Medicine"
+                            onClick={() => setActivePage('sales')}
+                            className="px-2 py-1 text-[11px] font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded border border-teal-200"
+                            title="Dispense this medicine"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
+                            Sell
                           </button>
-                          <button
-                            onClick={() => setDeletingMedicine(med)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                            title="Delete Medicine"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        )}
                       </td>
                     </tr>
                   );

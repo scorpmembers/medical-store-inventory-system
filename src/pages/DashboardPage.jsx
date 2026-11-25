@@ -30,7 +30,10 @@ export default function DashboardPage({ setActivePage }) {
     nearExpiryBatches,
     expiredBatches,
     sales,
-    medicines
+    medicines,
+    isAdmin,
+    isStaff,
+    user
   } = useStore();
 
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -43,11 +46,24 @@ export default function DashboardPage({ setActivePage }) {
       {/* Top Welcome & Quick Actions Bar */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 tracking-tight">
-            Pharmacy Control Center
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Real-time stock monitoring, today's sales tracking, and batch expiry surveillance.
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-lg font-bold text-slate-800 tracking-tight">
+              {isStaff ? `Staff Counter Dashboard - Welcome, ${user?.name || 'Staff'}` : 'Pharmacy Control Center'}
+            </h2>
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                isAdmin
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-teal-50 text-teal-700 border-teal-200'
+              }`}
+            >
+              {isAdmin ? 'ADMINISTRATOR' : 'STAFF MEMBER'}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500">
+            {isStaff
+              ? 'Authorized for counter sales, medicine search, batch status lookup, and patient receipt generation.'
+              : 'Real-time stock monitoring, sales turnover, user accounts, and batch expiry surveillance.'}
           </p>
         </div>
 
@@ -60,13 +76,34 @@ export default function DashboardPage({ setActivePage }) {
             <PlusCircle className="w-4 h-4" />
             <span>New Sale (POS)</span>
           </button>
-          <button
-            onClick={() => setActivePage('medicines')}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-          >
-            <Pill className="w-4 h-4 text-slate-500" />
-            <span>Add Medicine</span>
-          </button>
+
+          {isAdmin ? (
+            <>
+              <button
+                onClick={() => setActivePage('medicines')}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                <Pill className="w-4 h-4 text-slate-500" />
+                <span>Add Medicine</span>
+              </button>
+              <button
+                onClick={() => setActivePage('staff-management')}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors"
+              >
+                <Pill className="w-4 h-4 text-indigo-600 hidden" />
+                <span>Manage Staff</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setActivePage('medicines')}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              <Pill className="w-4 h-4 text-slate-500" />
+              <span>Browse Medicines</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActivePage('inventory')}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"

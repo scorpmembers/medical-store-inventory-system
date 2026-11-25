@@ -10,7 +10,9 @@ import {
   LogOut,
   X,
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  UserCheck,
+  ShieldCheck
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
@@ -22,14 +24,17 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
     lowStockMedicines,
     logout,
     resetToSampleData,
-    user
+    user,
+    isAdmin,
+    isStaff
   } = useStore();
 
   const totalAlerts = nearExpiryBatches.length + expiredBatches.length;
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'medicines', label: 'Medicines', icon: Pill, badge: totalMedicinesCount },
+  // Base navigation items available to all authenticated roles
+  const baseNavItems = [
+    { id: 'dashboard', label: isStaff ? 'Staff Dashboard' : 'Dashboard', icon: LayoutDashboard },
+    { id: 'medicines', label: 'Medicines Catalog', icon: Pill, badge: totalMedicinesCount },
     {
       id: 'inventory',
       label: 'Inventory & Expiry',
@@ -37,11 +42,19 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
       badge: totalAlerts > 0 ? `${totalAlerts}` : null,
       badgeColor: expiredBatches.length > 0 ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white'
     },
-    { id: 'sales', label: 'Sales (Billing)', icon: ShoppingCart },
-    { id: 'purchases', label: 'Purchases', icon: Truck },
-    { id: 'suppliers', label: 'Suppliers', icon: Users },
-    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
+    { id: 'sales', label: 'Sales (Billing POS)', icon: ShoppingCart },
   ];
+
+  // Admin-only navigation items
+  const adminNavItems = [
+    { id: 'purchases', label: 'Stock Purchases', icon: Truck },
+    { id: 'suppliers', label: 'Suppliers Directory', icon: Users },
+    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
+    { id: 'staff-management', label: 'Staff & Users', icon: UserCheck, badge: 'Admin', badgeColor: 'bg-indigo-100 text-indigo-700' },
+  ];
+
+  // If user is Admin, they get full access; staff gets operational billing and catalog
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
 
   const handleNavClick = (pageId) => {
     setActivePage(pageId);
@@ -76,7 +89,9 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
               <h1 className="font-bold text-slate-800 text-sm tracking-tight leading-tight">
                 MedStore IMS
               </h1>
-              <p className="text-[11px] text-teal-700 font-medium">Inventory System</p>
+              <p className="text-[11px] text-teal-700 font-medium">
+                {isAdmin ? 'Admin Portal' : 'Staff Portal'}
+              </p>
             </div>
           </div>
 
@@ -91,8 +106,19 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
 
         {/* Store Profile Quick Card */}
         <div className="px-4 py-3 mx-3 my-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-          <div className="font-semibold text-slate-800 truncate">
-            {user?.storeName || 'City Care Pharmacy'}
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-slate-800 truncate">
+              {user?.storeName || 'City Care Pharmacy'}
+            </span>
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                isAdmin
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'bg-teal-100 text-teal-700'
+              }`}
+            >
+              {isAdmin ? 'ADMIN' : 'STAFF'}
+            </span>
           </div>
           <div className="text-[11px] text-slate-500 font-mono mt-0.5">
             Lic: {user?.licenseNo || 'DL-PH-2024'}
@@ -140,29 +166,37 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
 
         {/* Footer Actions */}
         <div className="p-3 border-t border-slate-200 space-y-1.5 bg-slate-50/50">
-          {/* Reset Demo Data button */}
-          <button
-            onClick={() => {
-              if (window.confirm('Reset all demo data (medicines, batches, sales, suppliers) back to default initial state?')) {
-                resetToSampleData();
-              }
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:text-teal-700 hover:bg-slate-100 rounded-lg transition-colors"
-            title="Reset to fresh demo sample data"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-            <span>Reset Demo Data</span>
-          </button>
+          {/* Reset Demo Data button (Admin only) */}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (window.confirm('Reset all demo data (medicines, batches, sales, suppliers) back to default initial state?')) {
+                  resetToSampleData();
+                }
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:text-teal-700 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Reset to fresh demo sample data"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              <span>Reset Demo Data</span>
+            </button>
+          )}
 
           {/* User logout */}
           <div className="pt-1 flex items-center justify-between px-2">
             <div className="truncate pr-2">
-              <p className="text-xs font-medium text-slate-800 truncate">{user?.name || 'Pharmacist'}</p>
-              <p className="text-[10px] text-slate-400 truncate">{user?.role || 'Staff'}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-slate-800 truncate">
+                  {user?.name || 'User'}
+                </p>
+              </div>
+              <p className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                <span>{user?.email}</span>
+              </p>
             </div>
             <button
               onClick={logout}
-              title="Logout"
+              title="Sign Out"
               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
             >
               <LogOut className="w-4 h-4" />

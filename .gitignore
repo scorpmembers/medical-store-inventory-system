@@ -1,5 +1,26 @@
+# Frontend
 node_modules/
 dist/
+
+# Environment variables / secrets
 .env
 .env.*
 !.env.example
+
+# Backend - Maven build files
+backend/target/
+backend/.m2/
+
+# Java compiled files
+*.class
+
+# Logs
+*.log
+
+# IDE files
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db

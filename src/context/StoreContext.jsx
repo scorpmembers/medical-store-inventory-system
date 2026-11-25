@@ -8,6 +8,7 @@ import {
   INITIAL_CATEGORIES
 } from '../data/initialData';
 import { isExpired, isNearExpiry, getDaysRemaining } from '../utils/formatters';
+import { authApi } from '../services/api';
 
 const StoreContext = createContext(null);
 
@@ -18,6 +19,7 @@ const STORAGE_KEYS = {
   SALES: 'medstore_sales_v1',
   PURCHASES: 'medstore_purchases_v1',
   AUTH: 'medstore_auth_v1',
+  TOKEN: 'medstore_jwt_token',
 };
 
 export const StoreProvider = ({ children }) => {
@@ -47,22 +49,20 @@ export const StoreProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_PURCHASES;
   });
 
-  // Demo Auth state (persisted)
+  // User & JWT Authentication State
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem(STORAGE_KEYS.TOKEN) || null;
+  });
+
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.AUTH);
-    return saved
-      ? JSON.parse(saved)
-      : {
-          name: 'Dr. Rajesh Sharma',
-          role: 'Chief Pharmacist',
-          email: 'pharmacist@medstore.com',
-          storeName: 'City Care Pharmacy',
-          licenseNo: 'DL-PH-2024-8890',
-        };
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('medstore_is_auth_v1') !== 'false';
+    const savedToken = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    const savedUser = localStorage.getItem(STORAGE_KEYS.AUTH);
+    return Boolean(savedToken && savedUser);
   });
 
   // Toast notification state
@@ -90,9 +90,16 @@ export const StoreProvider = ({ children }) => {
   }, [purchases]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(user));
-    localStorage.setItem('medstore_is_auth_v1', isAuthenticated ? 'true' : 'false');
-  }, [user, isAuthenticated]);
+    if (user && token) {
+      localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(user));
+      localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      setIsAuthenticated(true);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.AUTH);
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      setIsAuthenticated(false);
+    }
+  }, [user, token]);
 
   // Toast Helper
   const showToast = (message, type = 'success', title = '') => {
@@ -102,35 +109,148 @@ export const StoreProvider = ({ children }) => {
 
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    }, 4500);
   };
 
   const removeToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Auth Functions
-  const login = (email, password) => {
+  // ================= AUTHENTICATION ACTIONS =================
+
+  /**
+   * Real Login with Spring Boot Backend (with graceful offline fallback)
+   */
+  const login = async (email, password) => {
     if (!email || !password) {
-      showToast('Please enter both email and password.', 'error', 'Login Failed');
-      return false;
+      throw new Error('Please enter both email and password.');
     }
-    const loggedUser = {
-      name: email.includes('admin') ? 'Store Admin' : 'Pharmacist Rajesh',
-      role: email.includes('admin') ? 'Store Owner / Admin' : 'Lead Pharmacist',
-      email: email,
-      storeName: 'City Care Pharmacy',
-      licenseNo: 'DL-PH-2024-8890',
-    };
-    setUser(loggedUser);
-    setIsAuthenticated(true);
-    showToast(`Welcome back, ${loggedUser.name}!`, 'success', 'Signed In');
-    return true;
+
+    try {
+      // 1. Attempt backend authentication
+      const response = await authApi.login({ email, password });
+
+      if (response && response.success && response.data) {
+        const authData = response.data;
+        const loggedUser = {
+          id: authData.id,
+          name: authData.name,
+          email: authData.email,
+          phone: authData.phone,
+          role: authData.role, // 'ROLE_ADMIN' or 'ROLE_STAFF'
+          storeName: 'City Care Pharmacy',
+          licenseNo: 'DL-PH-2024-8890',
+        };
+
+        setToken(authData.token);
+        setUser(loggedUser);
+        setIsAuthenticated(true);
+
+        const roleDisplay = authData.role === 'ROLE_ADMIN' ? 'Administrator' : 'Staff Member';
+        showToast(
+          `Welcome, ${authData.name}! Logged in as ${roleDisplay}.`,
+          'success',
+          'Authentication Successful'
+        );
+        return loggedUser;
+      } else {
+        throw new Error(response?.message || 'Login failed. Invalid response from server.');
+      }
+    } catch (err) {
+      // If backend is not currently running, provide helpful offline demonstration mode
+      if (err.isNetworkError) {
+        console.warn('Backend server not reachable on port 8080. Using local demo fallback.');
+
+        const isDemoAdmin = email.toLowerCase().includes('admin');
+        const fallbackUser = {
+          id: isDemoAdmin ? 1 : 2,
+          name: isDemoAdmin ? 'System Administrator' : 'Pharmacist Staff',
+          email: email.toLowerCase().trim(),
+          role: isDemoAdmin ? 'ROLE_ADMIN' : 'ROLE_STAFF',
+          storeName: 'City Care Pharmacy',
+          licenseNo: 'DL-PH-2024-8890',
+        };
+        const mockToken = `mock_jwt_token_${Date.now()}`;
+
+        setToken(mockToken);
+        setUser(fallbackUser);
+        setIsAuthenticated(true);
+
+        showToast(
+          `Logged in as ${fallbackUser.role === 'ROLE_ADMIN' ? 'Administrator' : 'Staff Member'} (Local Demo Mode). To use MySQL, run backend on port 8080.`,
+          'info',
+          'Notice'
+        );
+        return fallbackUser;
+      }
+      throw err;
+    }
   };
 
+  /**
+   * Real Staff Signup with Spring Boot Backend
+   */
+  const signup = async (signupData) => {
+    try {
+      const response = await authApi.signup(signupData);
+
+      if (response && response.success && response.data) {
+        const authData = response.data;
+        const newUser = {
+          id: authData.id,
+          name: authData.name,
+          email: authData.email,
+          phone: authData.phone,
+          role: authData.role || 'ROLE_STAFF',
+          storeName: 'City Care Pharmacy',
+          licenseNo: 'DL-PH-2024-8890',
+        };
+
+        setToken(authData.token);
+        setUser(newUser);
+        setIsAuthenticated(true);
+
+        showToast(
+          `Welcome ${newUser.name}! Your Staff account has been created in MySQL.`,
+          'success',
+          'Registration Complete'
+        );
+        return newUser;
+      } else {
+        throw new Error(response?.message || 'Signup failed.');
+      }
+    } catch (err) {
+      if (err.isNetworkError) {
+        // Fallback for offline demo
+        const fallbackUser = {
+          id: Date.now(),
+          name: signupData.name,
+          email: signupData.email,
+          phone: signupData.phone,
+          role: 'ROLE_STAFF',
+          storeName: 'City Care Pharmacy',
+          licenseNo: 'DL-PH-2024-8890',
+        };
+        setToken(`mock_token_${Date.now()}`);
+        setUser(fallbackUser);
+        setIsAuthenticated(true);
+        showToast(`Staff registered locally. Start Spring Boot to sync with MySQL.`, 'info');
+        return fallbackUser;
+      }
+      throw err;
+    }
+  };
+
+  /**
+   * Logout
+   */
   const logout = () => {
+    setUser(null);
+    setToken(null);
     setIsAuthenticated(false);
-    showToast('You have been logged out.', 'info', 'Logged Out');
+    localStorage.removeItem(STORAGE_KEYS.AUTH);
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    showToast('You have been logged out securely.', 'info', 'Session Ended');
   };
 
   // Medicine Operations
@@ -143,7 +263,6 @@ export const StoreProvider = ({ children }) => {
     };
     setMedicines((prev) => [newMed, ...prev]);
 
-    // If an initial batch was provided in the add form, add it too
     if (medicineData.initialBatch && medicineData.initialBatch.batchNumber) {
       const b = medicineData.initialBatch;
       const newBatch = {
@@ -168,7 +287,6 @@ export const StoreProvider = ({ children }) => {
     setMedicines((prev) =>
       prev.map((med) => (med.id === id ? { ...med, ...updatedData } : med))
     );
-    // Also update medicineName in batches if name changed
     if (updatedData.name) {
       setBatches((prev) =>
         prev.map((b) => (b.medicineId === id ? { ...b, medicineName: updatedData.name } : b))
@@ -247,13 +365,11 @@ export const StoreProvider = ({ children }) => {
 
   // Sales Operations (with strict validation & inventory deduction)
   const addSale = (saleData) => {
-    // 1. Validate items
     if (!saleData.items || saleData.items.length === 0) {
       showToast('Sale must contain at least one item.', 'error', 'Sale Failed');
       return false;
     }
 
-    // 2. Validate stock availability and expiry for each item
     for (const item of saleData.items) {
       const batch = batches.find((b) => b.batchNumber === item.batchNumber);
       if (!batch) {
@@ -261,7 +377,6 @@ export const StoreProvider = ({ children }) => {
         return false;
       }
 
-      // Check if batch is expired
       if (isExpired(batch.expiryDate)) {
         showToast(
           `Cannot sell expired medicine! Batch #${batch.batchNumber} expired on ${batch.expiryDate}.`,
@@ -271,7 +386,6 @@ export const StoreProvider = ({ children }) => {
         return false;
       }
 
-      // Check if quantity is sufficient
       if (item.quantity > batch.quantity) {
         showToast(
           `Insufficient stock for ${item.medicineName} (Batch ${batch.batchNumber}). Requested: ${item.quantity}, Available: ${batch.quantity}.`,
@@ -282,7 +396,6 @@ export const StoreProvider = ({ children }) => {
       }
     }
 
-    // 3. Deduct stock from batches
     setBatches((prevBatches) => {
       return prevBatches.map((b) => {
         const soldItem = saleData.items.find((item) => item.batchNumber === b.batchNumber);
@@ -296,7 +409,6 @@ export const StoreProvider = ({ children }) => {
       });
     });
 
-    // 4. Generate invoice number and record sale
     const today = new Date();
     const invoiceNumber = `INV-${today.getFullYear()}-${String(sales.length + 43).padStart(4, '0')}`;
     const newSale = {
@@ -315,7 +427,7 @@ export const StoreProvider = ({ children }) => {
     return newSale;
   };
 
-  // Purchase Operations (adds stock to inventory)
+  // Purchase Operations
   const addPurchase = (purchaseData) => {
     const today = new Date();
     const purchaseId = `PUR-${today.getFullYear()}-${String(purchases.length + 16).padStart(3, '0')}`;
@@ -328,14 +440,12 @@ export const StoreProvider = ({ children }) => {
       totalAmount: Number(purchaseData.quantity) * Number(purchaseData.purchasePrice)
     };
 
-    // Update batch quantity or create new batch
     setBatches((prevBatches) => {
       const existingBatchIndex = prevBatches.findIndex(
         (b) => b.batchNumber.toUpperCase() === purchaseData.batchNumber.toUpperCase()
       );
 
       if (existingBatchIndex >= 0) {
-        // Increase existing batch quantity
         const updated = [...prevBatches];
         updated[existingBatchIndex] = {
           ...updated[existingBatchIndex],
@@ -346,7 +456,6 @@ export const StoreProvider = ({ children }) => {
         };
         return updated;
       } else {
-        // Add as a new batch
         const med = medicines.find((m) => m.id === purchaseData.medicineId);
         const newBatch = {
           batchNumber: purchaseData.batchNumber.toUpperCase(),
@@ -440,6 +549,10 @@ export const StoreProvider = ({ children }) => {
   const totalRevenue = sales.reduce((sum, s) => sum + (Number(s.grandTotal) || 0), 0);
   const totalStockCount = batches.reduce((sum, b) => sum + Number(b.quantity), 0);
 
+  // Role Helpers
+  const isAdmin = user?.role === 'ROLE_ADMIN';
+  const isStaff = user?.role === 'ROLE_STAFF';
+
   const value = {
     // State
     medicines,
@@ -450,11 +563,15 @@ export const StoreProvider = ({ children }) => {
     purchases,
     categories: INITIAL_CATEGORIES,
     user,
+    token,
     isAuthenticated,
+    isAdmin,
+    isStaff,
     toasts,
 
     // Actions
     login,
+    signup,
     logout,
     showToast,
     removeToast,

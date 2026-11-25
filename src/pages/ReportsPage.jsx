@@ -25,7 +25,9 @@ export default function ReportsPage() {
     batches,
     medicines,
     totalRevenue,
-    showToast
+    showToast,
+    isAdmin,
+    user
   } = useStore();
 
   const [dateRange, setDateRange] = useState('month'); // 'week', 'month', 'year'
@@ -85,6 +87,25 @@ export default function ReportsPage() {
   const handleExportCSV = () => {
     showToast('Report CSV export completed (Demo simulation).', 'success', 'Exported');
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="bg-white rounded-2xl border border-rose-200 p-8 text-center max-w-lg mx-auto my-12 shadow-sm">
+        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-800 mb-1">
+          Access Restricted: Financial Reports
+        </h3>
+        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+          Store turnover, purchase costs, and profit margin analytics are restricted to <strong>Store Administrators</strong>. Staff member <strong>{user?.name || 'Staff'}</strong> is not authorized to view financial statements.
+        </p>
+        <div className="p-3 bg-slate-50 rounded-lg text-[11px] text-slate-600 border border-slate-200">
+          This role restriction is strictly enforced via Spring Security method authorization and frontend routing.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

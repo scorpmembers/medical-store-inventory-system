@@ -13,13 +13,14 @@ import SalesPage from './pages/SalesPage';
 import PurchasesPage from './pages/PurchasesPage';
 import SuppliersPage from './pages/SuppliersPage';
 import ReportsPage from './pages/ReportsPage';
+import StaffManagementPage from './pages/StaffManagementPage';
 
 export default function App() {
-  const { isAuthenticated } = useStore();
+  const { isAuthenticated, isAdmin, isStaff } = useStore();
   const [activePage, setActivePage] = useState('dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // If not logged in, render the clean demo Login Page
+  // If not logged in, render the clean Login / Signup page
   if (!isAuthenticated) {
     return (
       <>
@@ -60,12 +61,13 @@ export default function App() {
           {activePage === 'purchases' && <PurchasesPage setActivePage={setActivePage} />}
           {activePage === 'suppliers' && <SuppliersPage setActivePage={setActivePage} />}
           {activePage === 'reports' && <ReportsPage setActivePage={setActivePage} />}
+          {activePage === 'staff-management' && <StaffManagementPage setActivePage={setActivePage} />}
         </main>
 
         {/* Subtle Footer */}
         <footer className="py-4 px-6 border-t border-slate-200 text-center text-xs text-slate-400 bg-white">
           <p>
-            Medical Store Inventory System • College Major Project Demo • Built with React.js & Tailwind CSS
+            Medical Store Inventory System • Spring Boot + React.js + MySQL • B.Tech Final Year Project
           </p>
         </footer>
       </div>

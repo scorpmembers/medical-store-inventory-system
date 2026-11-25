@@ -25,7 +25,8 @@ export default function InventoryPage({ setActivePage }) {
     addBatch,
     deleteBatch,
     expiredBatches,
-    nearExpiryBatches
+    nearExpiryBatches,
+    isAdmin
   } = useStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,13 +128,15 @@ export default function InventoryPage({ setActivePage }) {
             <span>Go to Billing (POS)</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={handleOpenAddBatch}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-lg transition-colors shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Inward Batch</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={handleOpenAddBatch}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-lg transition-colors shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Inward Batch</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -354,13 +357,17 @@ export default function InventoryPage({ setActivePage }) {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => setDeletingBatch(batch)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                          title="Remove Batch"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {isAdmin ? (
+                          <button
+                            onClick={() => setDeletingBatch(batch)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            title="Remove Batch"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">View Only</span>
+                        )}
                       </td>
                     </tr>
                   );

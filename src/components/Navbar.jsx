@@ -8,7 +8,9 @@ import {
   AlertCircle,
   Clock,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { formatDate } from '../utils/formatters';
@@ -18,7 +20,9 @@ export default function Navbar({ activePage, setActivePage, setIsMobileOpen }) {
     user,
     nearExpiryBatches,
     expiredBatches,
-    lowStockMedicines
+    lowStockMedicines,
+    isAdmin,
+    isStaff
   } = useStore();
 
   const [showAlertsDropdown, setShowAlertsDropdown] = useState(false);
@@ -47,7 +51,7 @@ export default function Navbar({ activePage, setActivePage, setIsMobileOpen }) {
   const getPageTitle = (page) => {
     switch (page) {
       case 'dashboard':
-        return 'Dashboard Overview';
+        return isStaff ? 'Staff Counter Dashboard' : 'Dashboard Overview';
       case 'medicines':
         return 'Medicine Master Catalog';
       case 'inventory':
@@ -60,6 +64,8 @@ export default function Navbar({ activePage, setActivePage, setIsMobileOpen }) {
         return 'Supplier & Vendor Directory';
       case 'reports':
         return 'Reports & Performance Analytics';
+      case 'staff-management':
+        return 'Staff & User Access Management';
       default:
         return 'Dashboard';
     }
@@ -78,13 +84,27 @@ export default function Navbar({ activePage, setActivePage, setIsMobileOpen }) {
         </button>
 
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
-            {getPageTitle(activePage)}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
+              {getPageTitle(activePage)}
+            </h2>
+            <span
+              className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                isAdmin
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-teal-50 text-teal-700 border-teal-200'
+              }`}
+            >
+              {isAdmin ? <ShieldCheck className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+              {isAdmin ? 'ADMIN' : 'STAFF'}
+            </span>
+          </div>
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
             <span>MedStore IMS</span>
             <ChevronRight className="w-3 h-3 text-slate-400" />
-            <span className="text-teal-700 font-medium capitalize">{activePage}</span>
+            <span className="text-teal-700 font-medium capitalize">
+              {activePage.replace('-', ' ')}
+            </span>
           </div>
         </div>
       </div>
