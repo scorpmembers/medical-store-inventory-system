@@ -1,6 +1,6 @@
 /**
  * API Service for Medical Store Inventory and Sales Management System
- * Connects React frontend to Spring Boot backend running on http://localhost:8080/api
+ * Multi-Tenant Edition — Connects React frontend to Spring Boot backend on http://localhost:8080/api
  */
 
 const API_BASE_URL = 'http://localhost:8080/api';
@@ -55,12 +55,12 @@ async function request(endpoint, options = {}) {
 
 export const authApi = {
   /**
-   * Public Staff Registration
+   * Register a new Medical Store with Admin account
    */
-  signup: async (signupData) => {
-    return request('/auth/signup', {
+  registerStore: async (data) => {
+    return request('/auth/register-store', {
       method: 'POST',
-      body: JSON.stringify(signupData),
+      body: JSON.stringify(data),
     });
   },
 
@@ -84,27 +84,35 @@ export const authApi = {
   },
 };
 
+export const storeApi = {
+  /**
+   * Get authenticated user's store profile
+   */
+  getProfile: async () => {
+    return request('/stores/profile', { method: 'GET' });
+  },
+
+  /**
+   * Update store profile (Admin only)
+   */
+  updateProfile: async (data) => {
+    return request('/stores/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
 export const adminApi = {
   /**
-   * Get all users (Admin only)
-   */
-  getAllUsers: async () => {
-    return request('/admin/users', {
-      method: 'GET',
-    });
-  },
-
-  /**
-   * Get all staff members (Admin only)
+   * Get all staff members in the Admin's store (tenant-scoped)
    */
   getAllStaff: async () => {
-    return request('/admin/staff', {
-      method: 'GET',
-    });
+    return request('/admin/staff', { method: 'GET' });
   },
 
   /**
-   * Admin creates a staff member
+   * Admin creates a staff member scoped to their store
    */
   createStaff: async (staffData) => {
     return request('/admin/staff', {
@@ -117,28 +125,57 @@ export const adminApi = {
    * Toggle staff active/inactive status
    */
   toggleStaffStatus: async (staffId) => {
-    return request(`/admin/staff/${staffId}/toggle-status`, {
-      method: 'PUT',
-    });
+    return request(`/admin/staff/${staffId}/toggle-status`, { method: 'PUT' });
   },
 
   /**
    * Delete staff member
    */
   deleteStaff: async (staffId) => {
-    return request(`/admin/staff/${staffId}`, {
-      method: 'DELETE',
-    });
+    return request(`/admin/staff/${staffId}`, { method: 'DELETE' });
   },
 };
 
+export const medicineApi = {
+  getAll: async () => request('/medicines', { method: 'GET' }),
+  getById: async (id) => request(`/medicines/${id}`, { method: 'GET' }),
+  create: async (data) => request('/medicines', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id, data) => request(`/medicines/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id) => request(`/medicines/${id}`, { method: 'DELETE' }),
+};
+
+export const inventoryApi = {
+  getAll: async () => request('/inventory', { method: 'GET' }),
+  getByMedicine: async (medicineId) => request(`/inventory/medicine/${medicineId}`, { method: 'GET' }),
+  addBatch: async (medicineId, data) => request(`/inventory/medicine/${medicineId}`, { method: 'POST', body: JSON.stringify(data) }),
+  updateBatch: async (id, data) => request(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteBatch: async (id) => request(`/inventory/${id}`, { method: 'DELETE' }),
+};
+
+export const supplierApi = {
+  getAll: async () => request('/suppliers', { method: 'GET' }),
+  getById: async (id) => request(`/suppliers/${id}`, { method: 'GET' }),
+  create: async (data) => request('/suppliers', { method: 'POST', body: JSON.stringify(data) }),
+  update: async (id, data) => request(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: async (id) => request(`/suppliers/${id}`, { method: 'DELETE' }),
+};
+
+export const purchaseApi = {
+  getAll: async () => request('/purchases', { method: 'GET' }),
+  getById: async (id) => request(`/purchases/${id}`, { method: 'GET' }),
+  create: async (data) => request('/purchases', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const saleApi = {
+  getAll: async () => request('/sales', { method: 'GET' }),
+  getById: async (id) => request(`/sales/${id}`, { method: 'GET' }),
+  create: async (data) => request('/sales', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const reportApi = {
+  getDashboard: async () => request('/reports/dashboard', { method: 'GET' }),
+};
+
 export const staffApi = {
-  /**
-   * Get permissions for current authenticated user
-   */
-  getPermissions: async () => {
-    return request('/staff/permissions', {
-      method: 'GET',
-    });
-  },
+  getPermissions: async () => request('/staff/permissions', { method: 'GET' }),
 };

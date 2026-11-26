@@ -79,11 +79,11 @@ export default function SuppliersPage() {
   };
 
   // Submit Add
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    addSupplier({
+    const created = await addSupplier({
       name: formData.name.trim(),
       contactPerson: formData.contactPerson.trim(),
       phone: formData.phone.trim(),
@@ -93,15 +93,15 @@ export default function SuppliersPage() {
       status: formData.status
     });
 
-    setIsAddModalOpen(false);
+    if (created) setIsAddModalOpen(false);
   };
 
   // Submit Edit
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!editingSupplier || !formData.name.trim()) return;
 
-    updateSupplier(editingSupplier.id, {
+    const updated = await updateSupplier(editingSupplier.id, {
       name: formData.name.trim(),
       contactPerson: formData.contactPerson.trim(),
       phone: formData.phone.trim(),
@@ -111,14 +111,13 @@ export default function SuppliersPage() {
       status: formData.status
     });
 
-    setEditingSupplier(null);
+    if (updated) setEditingSupplier(null);
   };
 
   // Confirm Delete
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingSupplier) {
-      deleteSupplier(deletingSupplier.id);
-      setDeletingSupplier(null);
+      if (await deleteSupplier(deletingSupplier.id)) setDeletingSupplier(null);
     }
   };
 

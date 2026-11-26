@@ -47,33 +47,13 @@ export default function StaffManagementPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await adminApi.getAllUsers();
+      const response = await adminApi.getAllStaff();
       if (response && response.data) {
         setUsersList(response.data);
       }
     } catch (err) {
-      console.warn('Backend users fetch fallback to local:', err);
-      // Fallback demo users if offline
-      setUsersList([
-        {
-          id: 1,
-          name: 'System Administrator',
-          email: 'admin@medstore.com',
-          phone: '+91 98110 00001',
-          role: 'ROLE_ADMIN',
-          active: true,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          name: 'Pharmacist Staff',
-          email: 'staff@medstore.com',
-          phone: '+91 98110 00002',
-          role: 'ROLE_STAFF',
-          active: true,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setUsersList([]);
+      showToast(err.message || 'Unable to load staff members.', 'error', 'Staff Load Failed');
     } finally {
       setLoading(false);
     }
@@ -176,7 +156,6 @@ export default function StaffManagementPage() {
   });
 
   const staffCount = usersList.filter((u) => u.role === 'ROLE_STAFF').length;
-  const adminCount = usersList.filter((u) => u.role === 'ROLE_ADMIN').length;
   const activeCount = usersList.filter((u) => u.active).length;
 
   return (
@@ -230,7 +209,7 @@ export default function StaffManagementPage() {
             {usersList.length}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            {adminCount} Admin • {staffCount} Staff Members
+            {staffCount} Staff Members
           </p>
         </div>
 

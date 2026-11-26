@@ -1,53 +1,68 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  INITIAL_MEDICINES,
-  INITIAL_BATCHES,
-  INITIAL_SUPPLIERS,
-  INITIAL_SALES,
-  INITIAL_PURCHASES,
-  INITIAL_CATEGORIES
-} from '../data/initialData';
+import { INITIAL_CATEGORIES } from '../data/initialData';
 import { isExpired, isNearExpiry, getDaysRemaining } from '../utils/formatters';
-import { authApi } from '../services/api';
+import {
+  authApi,
+  storeApi,
+  medicineApi,
+  inventoryApi,
+  supplierApi,
+  purchaseApi,
+  saleApi,
+} from '../services/api';
 
 const StoreContext = createContext(null);
 
 const STORAGE_KEYS = {
-  MEDICINES: 'medstore_medicines_v1',
-  BATCHES: 'medstore_batches_v1',
-  SUPPLIERS: 'medstore_suppliers_v1',
-  SALES: 'medstore_sales_v1',
-  PURCHASES: 'medstore_purchases_v1',
   AUTH: 'medstore_auth_v1',
   TOKEN: 'medstore_jwt_token',
 };
 
+const responseData = (response) => {
+  if (!response?.success) {
+    throw new Error(response?.message || 'The server returned an invalid response.');
+  }
+  return response.data;
+};
+
+const normalizeBatch = (batch) => ({
+  ...batch,
+  medicineId: batch.medicine?.id,
+  medicineName: batch.medicine?.name || '',
+});
+
+const normalizeSale = (sale) => ({
+  ...sale,
+  date: sale.saleDate,
+  time: sale.saleTime,
+  items: (sale.items || []).map((item) => ({
+    ...item,
+    total: item.totalPrice,
+  })),
+});
+
+const normalizePurchase = (purchase) => {
+  const item = purchase.items?.[0] || {};
+  return {
+    ...purchase,
+    purchaseId: purchase.purchaseCode,
+    date: purchase.purchaseDate,
+    medicineId: item.medicineId,
+    medicineName: item.medicineName || '',
+    batchNumber: item.batchNumber || '',
+    quantity: item.quantity || 0,
+    purchasePrice: item.purchasePrice || 0,
+    totalAmount: purchase.totalAmount,
+  };
+};
+
 export const StoreProvider = ({ children }) => {
-  // Load from LocalStorage or initialize with sample data
-  const [medicines, setMedicines] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.MEDICINES);
-    return saved ? JSON.parse(saved) : INITIAL_MEDICINES;
-  });
-
-  const [batches, setBatches] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.BATCHES);
-    return saved ? JSON.parse(saved) : INITIAL_BATCHES;
-  });
-
-  const [suppliers, setSuppliers] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
-    return saved ? JSON.parse(saved) : INITIAL_SUPPLIERS;
-  });
-
-  const [sales, setSales] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SALES);
-    return saved ? JSON.parse(saved) : INITIAL_SALES;
-  });
-
-  const [purchases, setPurchases] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.PURCHASES);
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASES;
-  });
+  const [medicines, setMedicines] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [storeProfile, setStoreProfile] = useState(null);
 
   // User & JWT Authentication State
   const [token, setToken] = useState(() => {
@@ -68,27 +83,6 @@ export const StoreProvider = ({ children }) => {
   // Toast notification state
   const [toasts, setToasts] = useState([]);
 
-  // Persist state updates to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MEDICINES, JSON.stringify(medicines));
-  }, [medicines]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(batches));
-  }, [batches]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
-  }, [suppliers]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(sales));
-  }, [sales]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases));
-  }, [purchases]);
-
   useEffect(() => {
     if (user && token) {
       localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(user));
@@ -101,12 +95,73 @@ export const StoreProvider = ({ children }) => {
     }
   }, [user, token]);
 
+  useEffect(() => {
+    if (!token || !user) return undefined;
+    let active = true;
+
+    const loadTenantData = async () => {
+      try {
+        const [userResponse, profileResponse, medicinesResponse, batchesResponse, salesResponse] = await Promise.all([
+          authApi.getCurrentUser(),
+          storeApi.getProfile(),
+          medicineApi.getAll(),
+          inventoryApi.getAll(),
+          saleApi.getAll(),
+        ]);
+        if (!active) return;
+        const currentUser = responseData(userResponse);
+        const profile = responseData(profileResponse);
+        setStoreProfile(profile);
+        setUser((current) => current && ({
+          ...current,
+          id: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          phone: currentUser.phone,
+          role: currentUser.role,
+          storeId: currentUser.storeId,
+          storeName: profile.storeName,
+          address: profile.address,
+          gstin: profile.gstin,
+          licenseNo: profile.drugLicenseNumber,
+        }));
+        setMedicines(responseData(medicinesResponse) || []);
+        setBatches((responseData(batchesResponse) || []).map(normalizeBatch));
+        setSales((responseData(salesResponse) || []).map(normalizeSale));
+
+        if (user.role === 'ROLE_ADMIN') {
+          const [suppliersResponse, purchasesResponse] = await Promise.all([
+            supplierApi.getAll(),
+            purchaseApi.getAll(),
+          ]);
+          if (!active) return;
+          setSuppliers(responseData(suppliersResponse) || []);
+          setPurchases((responseData(purchasesResponse) || []).map(normalizePurchase));
+        } else {
+          setSuppliers([]);
+          setPurchases([]);
+        }
+      } catch (error) {
+        if (active) {
+          if (error.status === 401) {
+            setUser(null);
+            setToken(null);
+            clearTenantData();
+          }
+          showToast(error.message || 'Unable to load store data.', 'error', 'Data Load Failed');
+        }
+      }
+    };
+
+    loadTenantData();
+    return () => { active = false; };
+  }, [token, user?.id]);
+
   // Toast Helper
   const showToast = (message, type = 'success', title = '') => {
     const id = Date.now() + Math.random().toString();
     const newToast = { id, message, type, title };
     setToasts((prev) => [...prev, newToast]);
-
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4500);
@@ -118,125 +173,77 @@ export const StoreProvider = ({ children }) => {
 
   // ================= AUTHENTICATION ACTIONS =================
 
+  const clearTenantData = () => {
+    ['medstore_medicines_v1', 'medstore_batches_v1', 'medstore_suppliers_v1', 'medstore_sales_v1', 'medstore_purchases_v1']
+      .forEach((key) => localStorage.removeItem(key));
+    setMedicines([]);
+    setBatches([]);
+    setSuppliers([]);
+    setSales([]);
+    setPurchases([]);
+    setStoreProfile(null);
+  };
+
   /**
-   * Real Login with Spring Boot Backend (with graceful offline fallback)
+   * Authenticate against the Spring Boot backend.
    */
   const login = async (email, password) => {
     if (!email || !password) {
       throw new Error('Please enter both email and password.');
     }
 
-    try {
-      // 1. Attempt backend authentication
-      const response = await authApi.login({ email, password });
-
-      if (response && response.success && response.data) {
-        const authData = response.data;
-        const loggedUser = {
-          id: authData.id,
-          name: authData.name,
-          email: authData.email,
-          phone: authData.phone,
-          role: authData.role, // 'ROLE_ADMIN' or 'ROLE_STAFF'
-          storeName: 'City Care Pharmacy',
-          licenseNo: 'DL-PH-2024-8890',
-        };
-
-        setToken(authData.token);
-        setUser(loggedUser);
-        setIsAuthenticated(true);
-
-        const roleDisplay = authData.role === 'ROLE_ADMIN' ? 'Administrator' : 'Staff Member';
-        showToast(
-          `Welcome, ${authData.name}! Logged in as ${roleDisplay}.`,
-          'success',
-          'Authentication Successful'
-        );
-        return loggedUser;
-      } else {
-        throw new Error(response?.message || 'Login failed. Invalid response from server.');
-      }
-    } catch (err) {
-      // If backend is not currently running, provide helpful offline demonstration mode
-      if (err.isNetworkError) {
-        console.warn('Backend server not reachable on port 8080. Using local demo fallback.');
-
-        const isDemoAdmin = email.toLowerCase().includes('admin');
-        const fallbackUser = {
-          id: isDemoAdmin ? 1 : 2,
-          name: isDemoAdmin ? 'System Administrator' : 'Pharmacist Staff',
-          email: email.toLowerCase().trim(),
-          role: isDemoAdmin ? 'ROLE_ADMIN' : 'ROLE_STAFF',
-          storeName: 'City Care Pharmacy',
-          licenseNo: 'DL-PH-2024-8890',
-        };
-        const mockToken = `mock_jwt_token_${Date.now()}`;
-
-        setToken(mockToken);
-        setUser(fallbackUser);
-        setIsAuthenticated(true);
-
-        showToast(
-          `Logged in as ${fallbackUser.role === 'ROLE_ADMIN' ? 'Administrator' : 'Staff Member'} (Local Demo Mode). To use MySQL, run backend on port 8080.`,
-          'info',
-          'Notice'
-        );
-        return fallbackUser;
-      }
-      throw err;
+    const authData = responseData(await authApi.login({ email, password }));
+    if (!authData?.token || !authData?.storeId) {
+      throw new Error('Login response did not contain a valid session and store.');
     }
+    clearTenantData();
+    const loggedUser = {
+      id: authData.id,
+      name: authData.name,
+      email: authData.email,
+      phone: authData.phone,
+      role: authData.role,
+      storeId: authData.storeId,
+      storeName: authData.storeName || '',
+      licenseNo: authData.drugLicenseNumber || '',
+      address: authData.address || '',
+      gstin: authData.gstin || '',
+    };
+
+    setToken(authData.token);
+    setUser(loggedUser);
+    setIsAuthenticated(true);
+    const roleDisplay = authData.role === 'ROLE_ADMIN' ? 'Administrator' : 'Staff Member';
+    showToast(`Welcome, ${authData.name}! Logged in as ${roleDisplay}.`, 'success', 'Authentication Successful');
+    return loggedUser;
   };
 
   /**
-   * Real Staff Signup with Spring Boot Backend
+   * Register a new store (multi-tenant). This redirects after success.
    */
-  const signup = async (signupData) => {
+  const registerStore = async (registrationData) => {
+    return responseData(await authApi.registerStore(registrationData));
+  };
+
+  /**
+   * Update store profile
+   */
+  const updateStoreProfile = async (data) => {
     try {
-      const response = await authApi.signup(signupData);
-
-      if (response && response.success && response.data) {
-        const authData = response.data;
-        const newUser = {
-          id: authData.id,
-          name: authData.name,
-          email: authData.email,
-          phone: authData.phone,
-          role: authData.role || 'ROLE_STAFF',
-          storeName: 'City Care Pharmacy',
-          licenseNo: 'DL-PH-2024-8890',
-        };
-
-        setToken(authData.token);
-        setUser(newUser);
-        setIsAuthenticated(true);
-
-        showToast(
-          `Welcome ${newUser.name}! Your Staff account has been created in MySQL.`,
-          'success',
-          'Registration Complete'
-        );
-        return newUser;
-      } else {
-        throw new Error(response?.message || 'Signup failed.');
-      }
+      const updated = responseData(await storeApi.updateProfile(data));
+      setStoreProfile(updated);
+      setUser((prev) => prev && ({
+        ...prev,
+        name: data.ownerName,
+        storeName: updated.storeName,
+        licenseNo: updated.drugLicenseNumber || '',
+        address: updated.address,
+        gstin: updated.gstin || '',
+      }));
+      showToast('Store profile updated successfully.', 'success', 'Settings Saved');
+      return updated;
     } catch (err) {
-      if (err.isNetworkError) {
-        // Fallback for offline demo
-        const fallbackUser = {
-          id: Date.now(),
-          name: signupData.name,
-          email: signupData.email,
-          phone: signupData.phone,
-          role: 'ROLE_STAFF',
-          storeName: 'City Care Pharmacy',
-          licenseNo: 'DL-PH-2024-8890',
-        };
-        setToken(`mock_token_${Date.now()}`);
-        setUser(fallbackUser);
-        setIsAuthenticated(true);
-        showToast(`Staff registered locally. Start Spring Boot to sync with MySQL.`, 'info');
-        return fallbackUser;
-      }
+      showToast(err.message || 'Failed to update store profile.', 'error', 'Update Failed');
       throw err;
     }
   };
@@ -245,6 +252,7 @@ export const StoreProvider = ({ children }) => {
    * Logout
    */
   const logout = () => {
+    clearTenantData();
     setUser(null);
     setToken(null);
     setIsAuthenticated(false);
@@ -253,266 +261,214 @@ export const StoreProvider = ({ children }) => {
     showToast('You have been logged out securely.', 'info', 'Session Ended');
   };
 
-  // Medicine Operations
-  const addMedicine = (medicineData) => {
-    const newId = `MED-${Math.floor(100 + Math.random() * 900)}`;
-    const newMed = {
-      ...medicineData,
-      id: newId,
-      minStockAlert: Number(medicineData.minStockAlert) || 15
-    };
-    setMedicines((prev) => [newMed, ...prev]);
-
-    if (medicineData.initialBatch && medicineData.initialBatch.batchNumber) {
-      const b = medicineData.initialBatch;
-      const newBatch = {
-        batchNumber: b.batchNumber.toUpperCase(),
-        medicineId: newId,
-        medicineName: newMed.name,
-        quantity: Number(b.quantity) || 0,
-        purchasePrice: Number(b.purchasePrice) || 0,
-        sellingPrice: Number(b.sellingPrice) || 0,
-        mfgDate: b.mfgDate || new Date().toISOString().split('T')[0],
-        expiryDate: b.expiryDate,
-        supplierName: b.supplierName || 'Direct Purchase'
-      };
-      setBatches((prev) => [newBatch, ...prev]);
+  const addMedicine = async (medicineData) => {
+    const { initialBatch, ...medicinePayload } = medicineData;
+    try {
+      const created = responseData(await medicineApi.create(medicinePayload));
+      setMedicines((prev) => [created, ...prev]);
+      if (initialBatch?.batchNumber) {
+        const batch = responseData(await inventoryApi.addBatch(created.id, {
+          ...initialBatch,
+          batchNumber: initialBatch.batchNumber.toUpperCase(),
+          quantity: Number(initialBatch.quantity),
+          purchasePrice: Number(initialBatch.purchasePrice),
+          sellingPrice: Number(initialBatch.sellingPrice),
+          mfgDate: initialBatch.mfgDate || new Date().toISOString().split('T')[0],
+        }));
+        setBatches((prev) => [normalizeBatch(batch), ...prev]);
+      }
+      showToast(`Medicine "${created.name}" added successfully.`, 'success', 'Medicine Added');
+      return created;
+    } catch (error) {
+      showToast(error.message || 'Unable to add medicine.', 'error', 'Medicine Add Failed');
+      return null;
     }
-
-    showToast(`Medicine "${newMed.name}" added successfully.`, 'success', 'Medicine Added');
-    return newMed;
   };
 
-  const updateMedicine = (id, updatedData) => {
-    setMedicines((prev) =>
-      prev.map((med) => (med.id === id ? { ...med, ...updatedData } : med))
-    );
-    if (updatedData.name) {
-      setBatches((prev) =>
-        prev.map((b) => (b.medicineId === id ? { ...b, medicineName: updatedData.name } : b))
-      );
+  const updateMedicine = async (id, updatedData) => {
+    try {
+      const updated = responseData(await medicineApi.update(id, updatedData));
+      setMedicines((prev) => prev.map((med) => (med.id === id ? updated : med)));
+      showToast('Medicine details updated.', 'success', 'Update Complete');
+      return updated;
+    } catch (error) {
+      showToast(error.message || 'Unable to update medicine.', 'error', 'Update Failed');
+      return null;
     }
-    showToast(`Medicine details updated.`, 'success', 'Update Complete');
   };
 
-  const deleteMedicine = (id) => {
-    const target = medicines.find((m) => m.id === id);
-    setMedicines((prev) => prev.filter((m) => m.id !== id));
-    setBatches((prev) => prev.filter((b) => b.medicineId !== id));
-    showToast(`Medicine "${target?.name || id}" and its batches deleted.`, 'info', 'Medicine Deleted');
+  const deleteMedicine = async (id) => {
+    try {
+      await medicineApi.delete(id);
+      setMedicines((prev) => prev.filter((med) => med.id !== id));
+      showToast('Medicine removed from the active catalog.', 'info', 'Medicine Deleted');
+      return true;
+    } catch (error) {
+      showToast(error.message || 'Unable to delete medicine.', 'error', 'Delete Failed');
+      return false;
+    }
   };
 
   // Batch Operations
-  const addBatch = (batchData) => {
-    const existing = batches.find((b) => b.batchNumber.toUpperCase() === batchData.batchNumber.toUpperCase());
-    if (existing) {
-      showToast(`Batch #${batchData.batchNumber} already exists. Please update it or use a unique batch number.`, 'error', 'Duplicate Batch');
+  const addBatch = async (batchData) => {
+    try {
+      const batch = responseData(await inventoryApi.addBatch(batchData.medicineId, {
+        batchNumber: batchData.batchNumber.toUpperCase(),
+        quantity: Number(batchData.quantity),
+        purchasePrice: Number(batchData.purchasePrice),
+        sellingPrice: Number(batchData.sellingPrice),
+        mfgDate: batchData.mfgDate,
+        expiryDate: batchData.expiryDate,
+        supplierName: batchData.supplierName,
+      }));
+      setBatches((prev) => [normalizeBatch(batch), ...prev]);
+      showToast(`Batch #${batch.batchNumber} added with ${batch.quantity} units.`, 'success', 'Batch Added');
+      return true;
+    } catch (error) {
+      showToast(error.message || 'Unable to add inventory batch.', 'error', 'Batch Add Failed');
       return false;
     }
-
-    const med = medicines.find((m) => m.id === batchData.medicineId);
-    const newBatch = {
-      ...batchData,
-      batchNumber: batchData.batchNumber.toUpperCase(),
-      medicineName: med ? med.name : batchData.medicineName,
-      quantity: Number(batchData.quantity) || 0,
-      purchasePrice: Number(batchData.purchasePrice) || 0,
-      sellingPrice: Number(batchData.sellingPrice) || 0,
-    };
-
-    setBatches((prev) => [newBatch, ...prev]);
-    showToast(`Batch #${newBatch.batchNumber} added with ${newBatch.quantity} units.`, 'success', 'Batch Added');
-    return true;
   };
 
-  const updateBatch = (batchNumber, updatedData) => {
-    setBatches((prev) =>
-      prev.map((b) => (b.batchNumber === batchNumber ? { ...b, ...updatedData } : b))
-    );
-    showToast(`Batch #${batchNumber} updated.`, 'success', 'Batch Updated');
+  const updateBatch = async (batchNumber, updatedData) => {
+    const target = batches.find((batch) => batch.batchNumber === batchNumber);
+    if (!target) return false;
+    try {
+      const updated = normalizeBatch(responseData(await inventoryApi.updateBatch(target.id, updatedData)));
+      setBatches((prev) => prev.map((batch) => (batch.id === target.id ? updated : batch)));
+      showToast(`Batch #${batchNumber} updated.`, 'success', 'Batch Updated');
+      return true;
+    } catch (error) {
+      showToast(error.message || 'Unable to update batch.', 'error', 'Update Failed');
+      return false;
+    }
   };
 
-  const deleteBatch = (batchNumber) => {
-    setBatches((prev) => prev.filter((b) => b.batchNumber !== batchNumber));
-    showToast(`Batch #${batchNumber} removed from inventory.`, 'info', 'Batch Removed');
+  const deleteBatch = async (batchNumber) => {
+    const target = batches.find((batch) => batch.batchNumber === batchNumber);
+    if (!target) return false;
+    try {
+      await inventoryApi.deleteBatch(target.id);
+      setBatches((prev) => prev.filter((batch) => batch.id !== target.id));
+      showToast(`Batch #${batchNumber} removed from inventory.`, 'info', 'Batch Removed');
+      return true;
+    } catch (error) {
+      showToast(error.message || 'Unable to remove batch.', 'error', 'Delete Failed');
+      return false;
+    }
   };
 
   // Supplier Operations
-  const addSupplier = (supplierData) => {
-    const newId = `SUP-${String(suppliers.length + 1).padStart(3, '0')}`;
-    const newSup = {
-      ...supplierData,
-      id: newId,
-      status: supplierData.status || 'Active'
-    };
-    setSuppliers((prev) => [...prev, newSup]);
-    showToast(`Supplier "${newSup.name}" added successfully.`, 'success', 'Supplier Added');
-    return newSup;
+  const addSupplier = async (supplierData) => {
+    try {
+      const created = responseData(await supplierApi.create(supplierData));
+      setSuppliers((prev) => [...prev, created]);
+      showToast(`Supplier "${created.name}" added successfully.`, 'success', 'Supplier Added');
+      return created;
+    } catch (error) {
+      showToast(error.message || 'Unable to add supplier.', 'error', 'Supplier Add Failed');
+      return null;
+    }
   };
 
-  const updateSupplier = (id, updatedData) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => (sup.id === id ? { ...sup, ...updatedData } : sup))
-    );
-    showToast(`Supplier updated successfully.`, 'success', 'Supplier Updated');
+  const updateSupplier = async (id, updatedData) => {
+    try {
+      const updated = responseData(await supplierApi.update(id, updatedData));
+      setSuppliers((prev) => prev.map((sup) => (sup.id === id ? updated : sup)));
+      showToast('Supplier updated successfully.', 'success', 'Supplier Updated');
+      return updated;
+    } catch (error) {
+      showToast(error.message || 'Unable to update supplier.', 'error', 'Update Failed');
+      return null;
+    }
   };
 
-  const deleteSupplier = (id) => {
-    const target = suppliers.find((s) => s.id === id);
-    setSuppliers((prev) => prev.filter((s) => s.id !== id));
-    showToast(`Supplier "${target?.name || id}" deleted.`, 'info', 'Supplier Deleted');
-  };
-
-  // Sales Operations (with strict validation & inventory deduction)
-  const addSale = (saleData) => {
-    if (!saleData.items || saleData.items.length === 0) {
-      showToast('Sale must contain at least one item.', 'error', 'Sale Failed');
+  const deleteSupplier = async (id) => {
+    try {
+      await supplierApi.delete(id);
+      setSuppliers((prev) => prev.filter((sup) => sup.id !== id));
+      showToast('Supplier deleted.', 'info', 'Supplier Deleted');
+      return true;
+    } catch (error) {
+      showToast(error.message || 'Unable to delete supplier.', 'error', 'Delete Failed');
       return false;
     }
-
-    for (const item of saleData.items) {
-      const batch = batches.find((b) => b.batchNumber === item.batchNumber);
-      if (!batch) {
-        showToast(`Batch ${item.batchNumber} was not found in stock.`, 'error', 'Invalid Batch');
-        return false;
-      }
-
-      if (isExpired(batch.expiryDate)) {
-        showToast(
-          `Cannot sell expired medicine! Batch #${batch.batchNumber} expired on ${batch.expiryDate}.`,
-          'error',
-          'Expired Medicine Blocked'
-        );
-        return false;
-      }
-
-      if (item.quantity > batch.quantity) {
-        showToast(
-          `Insufficient stock for ${item.medicineName} (Batch ${batch.batchNumber}). Requested: ${item.quantity}, Available: ${batch.quantity}.`,
-          'error',
-          'Stock Limit Exceeded'
-        );
-        return false;
-      }
-    }
-
-    setBatches((prevBatches) => {
-      return prevBatches.map((b) => {
-        const soldItem = saleData.items.find((item) => item.batchNumber === b.batchNumber);
-        if (soldItem) {
-          return {
-            ...b,
-            quantity: Math.max(0, b.quantity - soldItem.quantity)
-          };
-        }
-        return b;
-      });
-    });
-
-    const today = new Date();
-    const invoiceNumber = `INV-${today.getFullYear()}-${String(sales.length + 43).padStart(4, '0')}`;
-    const newSale = {
-      ...saleData,
-      invoiceNumber,
-      date: saleData.date || today.toISOString().split('T')[0],
-      time: saleData.time || today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    setSales((prev) => [newSale, ...prev]);
-    showToast(
-      `Sale completed! Invoice #${invoiceNumber} for ₹${newSale.grandTotal.toFixed(2)}.`,
-      'success',
-      'Sale Successful'
-    );
-    return newSale;
   };
 
-  // Purchase Operations
-  const addPurchase = (purchaseData) => {
-    const today = new Date();
-    const purchaseId = `PUR-${today.getFullYear()}-${String(purchases.length + 16).padStart(3, '0')}`;
+  const addSale = async (saleData) => {
+    try {
+      const created = normalizeSale(responseData(await saleApi.create({
+        ...saleData,
+        saleDate: saleData.date,
+        saleTime: saleData.time,
+        items: saleData.items.map(({ medicineId, expiryDate, total, ...item }) => ({
+          ...item,
+          totalPrice: item.totalPrice ?? total,
+        })),
+      })));
+      setSales((prev) => [created, ...prev]);
+      try {
+        const updatedBatches = responseData(await inventoryApi.getAll());
+        setBatches(updatedBatches.map(normalizeBatch));
+      } catch (refreshError) {
+        showToast(refreshError.message || 'Sale saved, but inventory refresh failed.', 'warning', 'Refresh Failed');
+      }
+      showToast(`Sale completed! Invoice #${created.invoiceNumber}.`, 'success', 'Sale Successful');
+      return created;
+    } catch (error) {
+      showToast(error.message || 'Unable to complete sale.', 'error', 'Sale Failed');
+      return false;
+    }
+  };
 
-    const newPurchase = {
-      ...purchaseData,
-      purchaseId,
-      date: purchaseData.date || today.toISOString().split('T')[0],
-      status: 'Received',
-      totalAmount: Number(purchaseData.quantity) * Number(purchaseData.purchasePrice)
-    };
-
-    setBatches((prevBatches) => {
-      const existingBatchIndex = prevBatches.findIndex(
-        (b) => b.batchNumber.toUpperCase() === purchaseData.batchNumber.toUpperCase()
-      );
-
-      if (existingBatchIndex >= 0) {
-        const updated = [...prevBatches];
-        updated[existingBatchIndex] = {
-          ...updated[existingBatchIndex],
-          quantity: updated[existingBatchIndex].quantity + Number(purchaseData.quantity),
-          purchasePrice: Number(purchaseData.purchasePrice),
-          sellingPrice: Number(purchaseData.sellingPrice) || updated[existingBatchIndex].sellingPrice,
-          expiryDate: purchaseData.expiryDate || updated[existingBatchIndex].expiryDate,
-        };
-        return updated;
-      } else {
-        const med = medicines.find((m) => m.id === purchaseData.medicineId);
-        const newBatch = {
+  const addPurchase = async (purchaseData) => {
+    try {
+      const created = responseData(await purchaseApi.create({
+        purchaseCode: `PUR-${Date.now()}`,
+        invoiceNumber: purchaseData.invoiceNumber,
+        supplierName: purchaseData.supplierName,
+        totalAmount: Number(purchaseData.quantity) * Number(purchaseData.purchasePrice),
+        purchaseDate: purchaseData.date || new Date().toISOString().split('T')[0],
+        status: 'Received',
+        items: [{
+          medicineName: purchaseData.medicineName,
           batchNumber: purchaseData.batchNumber.toUpperCase(),
-          medicineId: purchaseData.medicineId,
-          medicineName: med ? med.name : purchaseData.medicineName,
           quantity: Number(purchaseData.quantity),
           purchasePrice: Number(purchaseData.purchasePrice),
-          sellingPrice: Number(purchaseData.sellingPrice) || Number(purchaseData.purchasePrice) * 1.3,
-          mfgDate: purchaseData.mfgDate || today.toISOString().split('T')[0],
+          sellingPrice: Number(purchaseData.sellingPrice),
           expiryDate: purchaseData.expiryDate,
-          supplierId: purchaseData.supplierId,
-          supplierName: purchaseData.supplierName
-        };
-        return [newBatch, ...prevBatches];
+          totalCost: Number(purchaseData.quantity) * Number(purchaseData.purchasePrice),
+        }],
+      }));
+      const normalizedCreated = normalizePurchase(created);
+      setPurchases((prev) => [normalizedCreated, ...prev]);
+      try {
+        const [batchResponse, purchasesResponse] = await Promise.all([
+          inventoryApi.getAll(),
+          purchaseApi.getAll(),
+        ]);
+        setBatches((responseData(batchResponse) || []).map(normalizeBatch));
+        setPurchases((responseData(purchasesResponse) || []).map(normalizePurchase));
+      } catch (refreshError) {
+        showToast(refreshError.message || 'Purchase saved, but inventory refresh failed.', 'warning', 'Refresh Failed');
       }
-    });
-
-    setPurchases((prev) => [newPurchase, ...prev]);
-    showToast(
-      `Purchase #${purchaseId} recorded. Stock of ${purchaseData.medicineName} increased by ${purchaseData.quantity}.`,
-      'success',
-      'Purchase Recorded'
-    );
-    return newPurchase;
-  };
-
-  // Reset to initial sample data
-  const resetToSampleData = () => {
-    setMedicines(INITIAL_MEDICINES);
-    setBatches(INITIAL_BATCHES);
-    setSuppliers(INITIAL_SUPPLIERS);
-    setSales(INITIAL_SALES);
-    setPurchases(INITIAL_PURCHASES);
-    localStorage.removeItem(STORAGE_KEYS.MEDICINES);
-    localStorage.removeItem(STORAGE_KEYS.BATCHES);
-    localStorage.removeItem(STORAGE_KEYS.SUPPLIERS);
-    localStorage.removeItem(STORAGE_KEYS.SALES);
-    localStorage.removeItem(STORAGE_KEYS.PURCHASES);
-    showToast('Reset all inventory, sales, and suppliers to clean sample data.', 'info', 'Data Reset');
+      return normalizedCreated;
+    } catch (error) {
+      showToast(error.message || 'Unable to record purchase.', 'error', 'Purchase Failed');
+      return null;
+    }
   };
 
   // Helper selectors
-  const getMedicineStock = (medicineId) => {
-    return batches
-      .filter((b) => b.medicineId === medicineId)
-      .reduce((sum, b) => sum + b.quantity, 0);
-  };
+  const getMedicineStock = (medicineId) =>
+    batches.filter((b) => String(b.medicineId) === String(medicineId)).reduce((sum, b) => sum + b.quantity, 0);
 
-  const getAvailableNonExpiredStock = (medicineId) => {
-    return batches
-      .filter((b) => b.medicineId === medicineId && !isExpired(b.expiryDate))
+  const getAvailableNonExpiredStock = (medicineId) =>
+    batches
+      .filter((b) => String(b.medicineId) === String(medicineId) && !isExpired(b.expiryDate))
       .reduce((sum, b) => sum + b.quantity, 0);
-  };
 
-  const getBatchesForMedicine = (medicineId) => {
-    return batches.filter((b) => b.medicineId === medicineId);
-  };
+  const getBatchesForMedicine = (medicineId) => batches.filter((b) => String(b.medicineId) === String(medicineId));
 
   // Aggregated Batches with computed status
   const batchesWithStatus = batches.map((b) => {
@@ -523,15 +479,7 @@ export const StoreProvider = ({ children }) => {
     if (expired) status = 'expired';
     else if (nearExpiry) status = 'near-expiry';
     else if (b.quantity <= 15) status = 'low-stock';
-
-    return {
-      ...b,
-      daysLeft,
-      isExpired: expired,
-      isNearExpiry: nearExpiry,
-      isLowStock: b.quantity <= 15,
-      status
-    };
+    return { ...b, daysLeft, isExpired: expired, isNearExpiry: nearExpiry, isLowStock: b.quantity <= 15, status };
   });
 
   // Alert calculations
@@ -563,6 +511,7 @@ export const StoreProvider = ({ children }) => {
     purchases,
     categories: INITIAL_CATEGORIES,
     user,
+    storeProfile,
     token,
     isAuthenticated,
     isAdmin,
@@ -571,7 +520,8 @@ export const StoreProvider = ({ children }) => {
 
     // Actions
     login,
-    signup,
+    registerStore,
+    updateStoreProfile,
     logout,
     showToast,
     removeToast,
@@ -586,7 +536,6 @@ export const StoreProvider = ({ children }) => {
     deleteSupplier,
     addSale,
     addPurchase,
-    resetToSampleData,
 
     // Getters & Metrics
     getMedicineStock,

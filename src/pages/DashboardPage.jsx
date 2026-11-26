@@ -48,7 +48,9 @@ export default function DashboardPage({ setActivePage }) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">
-              {isStaff ? `Staff Counter Dashboard - Welcome, ${user?.name || 'Staff'}` : 'Pharmacy Control Center'}
+              {isStaff
+                ? `Staff Counter Dashboard - Welcome, ${user?.name || 'Staff'}`
+                : `${user?.storeName || 'Medical Store'} Control Center`}
             </h2>
             <span
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -219,7 +221,7 @@ export default function DashboardPage({ setActivePage }) {
             </span>
           </div>
 
-          <SalesBarChart />
+          <SalesBarChart sales={sales} />
         </div>
 
         {/* Medicine Category Distribution */}
@@ -233,7 +235,7 @@ export default function DashboardPage({ setActivePage }) {
             </p>
           </div>
 
-          <CategoryBreakdownList />
+          <CategoryBreakdownList medicines={medicines} />
         </div>
       </div>
 

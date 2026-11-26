@@ -1,5 +1,6 @@
 package com.medstore.security;
 
+import com.medstore.model.Store;
 import com.medstore.model.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -34,6 +35,18 @@ public class CustomUserDetails implements UserDetails {
 
     public String getRoleName() {
         return user.getRole().name();
+    }
+
+    public Long getStoreId() {
+        return user.getStore() != null ? user.getStore().getId() : null;
+    }
+
+    public String getStoreName() {
+        return user.getStore() != null ? user.getStore().getStoreName() : null;
+    }
+
+    public Store getStore() {
+        return user.getStore();
     }
 
     @Override

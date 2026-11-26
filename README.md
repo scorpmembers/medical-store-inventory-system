@@ -1,258 +1,343 @@
-# Medical Store Inventory and Sales Management System (MedStore IMS)
+# Medical Store Inventory and Sales Management System
 
-A full-stack, enterprise-grade web application designed for retail pharmacies, chemist shops, and medical stores to manage inventory, batch expiration surveillance, purchases, point-of-sale (POS) billing, supplier directories, and role-based staff access.
+A web application for managing the day-to-day operations of independent medical stores. Store owners can register a store, administer staff, and manage store-specific medicines, inventory, suppliers, purchases, sales, and reports.
 
-Developed as a **B.Tech Final-Year Major Project**.
+> **Project status:** Core frontend and backend flows are implemented. The backend build, automated tests, and frontend production build have passed locally. A live MySQL/API end-to-end run has not been performed.
 
----
+## Overview
 
-## 🚀 Technology Stack
+Medical stores often track stock, batches, expiry dates, purchases, and sales manually. This can make it difficult to keep inventory accurate, find expiring products, and understand store performance.
 
-### **Backend**
-- **Framework:** Spring Boot (v3.3.5)
-- **Language:** Java 17+
-- **Security:** Spring Security 6 with BCrypt Password Hashing & Stateless JWT Authentication
-- **Persistence:** Spring Data JPA / Hibernate ORM
-- **Database:** MySQL Server 8.0+ (`medical_store_db`)
-- **Build Tool:** Apache Maven
-- **Port:** `8080`
+This project provides a React interface backed by a Spring Boot REST API and a MySQL database. Each registered store has its own Admin account and tenant-scoped business data. Staff accounts are created by that store's Admin.
 
-### **Frontend**
-- **Library:** React.js (v18)
-- **Language:** JavaScript (ES6+, JSX) — *No TypeScript*
-- **Styling:** Tailwind CSS (v3) with Custom Pharmacy Palette
-- **Icons:** Lucide React
-- **Build & Dev Tool:** Vite
-- **Port:** `3000` (or `5173`)
+## Problem Statement
 
----
+- Manual inventory records are difficult to keep current.
+- Batch and expiry information can be overlooked.
+- Sales and purchase records are harder to reconcile when maintained separately.
+- Store owners need a simple way to manage staff and review business activity.
+- A shared application must prevent one store from reading or changing another store's records.
 
-## 📂 Project Architecture
+## Objectives
 
+- Provide a single interface for common medical-store operations.
+- Track medicines and batch-level quantities and expiry dates.
+- Record sales and purchases and update inventory through the backend.
+- Provide role-based Admin and Staff experiences.
+- Support independent store registration and isolate store data using the authenticated user's tenant context.
+
+## Key Features
+
+### Store registration and profile
+
+- Public registration creates a store and its first Admin account.
+- Registration collects owner and store details and validates submitted data.
+- Admins can view and update their authenticated store's profile.
+- Store name and profile information are displayed dynamically in relevant parts of the interface.
+- Public Staff registration is disabled; Admins create and manage Staff accounts.
+
+### Inventory and operations
+
+- **Medicines:** store-scoped medicine catalog and Admin-managed records.
+- **Inventory:** batch number, quantity, prices, manufacture/expiry dates, and expiry/low-stock indicators.
+- **Suppliers:** Admin-managed supplier directory.
+- **Purchases:** Admins can record purchases; backend purchase processing updates stock.
+- **Sales:** Admins and Staff can record sales; backend sale processing updates stock.
+- **Dashboard and reports:** store-scoped summary and sales/inventory reporting.
+- **Invoices:** sale invoice details include the current store's information.
+- **Reports:** the UI supports CSV export and browser printing.
+
+### Roles in the application
+
+| Role  | Main interface capabilities                                                                                 |
+| ----- | ----------------------------------------------------------------------------------------------------------- |
+| Admin | Dashboard, medicines, inventory, sales, purchases, suppliers, reports, staff management, and store settings |
+| Staff | Dashboard, medicine catalog, inventory viewing, and sales                                                   |
+
+The interface hides Admin-only pages from Staff, and backend endpoints apply role checks to protected operations. See [Authentication and security](#authentication-and-security) for a documented report-endpoint limitation.
+
+## Technologies
+
+| Area            | Technologies                                                                                       |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| Frontend        | React 18, JavaScript, Vite, Tailwind CSS, Lucide React                                             |
+| Backend         | Java 17, Spring Boot 3.3, Spring Web, Spring Security, Spring Data JPA, Hibernate, Bean Validation |
+| Authentication  | JSON Web Tokens (JJWT), BCrypt                                                                     |
+| Database        | MySQL                                                                                              |
+| Build and tests | npm, Maven, JUnit, Spring Boot Test                                                                |
+
+## System Architecture
+
+The frontend calls the Spring Boot REST API. The backend applies authentication and authorization, runs business services, and accesses MySQL through Spring Data JPA/Hibernate.
+
+```mermaid
+flowchart LR
+    User["Admin or Staff"]
+    Browser["Browser"]
+    React["React frontend<br/>Vite and Tailwind CSS"]
+    API["Spring Boot REST API<br/>Controllers and validation"]
+    Security["Spring Security<br/>JWT authentication and role checks"]
+    Services["Business services"]
+    JPA["Spring Data JPA / Hibernate"]
+    MySQL[("MySQL")]
+
+    User --> Browser
+    Browser --> React
+    React -->|"HTTP / JSON, Bearer JWT"| API
+    API --> Security
+    Security --> Services
+    Services --> JPA
+    JPA --> MySQL
 ```
+
+### Multi-store workflow
+
+Each Admin and Staff member belongs to a store. Business operations take the store ID from the authenticated backend principal; clients do not select a tenant ID to access records.
+
+```mermaid
+flowchart TD
+    Owner["Store owner"] --> Register["Register store"]
+    Register --> Create["Create Store and initial Admin"]
+    Create --> Admin["Store Admin"]
+    Admin --> StaffCreate["Admin creates Staff"]
+    StaffCreate --> Staff["Staff linked to the same Store"]
+    Admin --> Login["Admin or Staff logs in"]
+    Staff --> Login
+    Login --> JWT["JWT contains identity, role, and store context"]
+    JWT --> Request["Authenticated API request"]
+    Request --> Principal["Backend derives store from authenticated principal"]
+    Principal --> Scoped["Store-scoped service and repository queries"]
+    Scoped --> Data[("That store's medicines, batches, suppliers,<br/>purchases, sales, and reports")]
+```
+
+### Authentication workflow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as React frontend
+    participant Auth as Spring Boot Auth API
+    participant AuthManager as Spring Security
+    participant DB as MySQL
+    participant Filter as JWT filter
+    participant API as Protected API
+
+    User->>UI: Enter email and password
+    UI->>Auth: POST /api/auth/login
+    Auth->>DB: Check user and store active status
+    Auth->>AuthManager: Authenticate email and password
+    AuthManager->>DB: Load authentication principal and password hash
+    AuthManager-->>Auth: Credentials verified
+    Auth-->>UI: Return signed JWT and user/store details
+    UI->>UI: Store session token in browser localStorage
+    UI->>API: Send Authorization: Bearer JWT
+    API->>Filter: Validate token
+    Filter->>DB: Load authenticated user
+    Filter-->>API: Set authenticated principal and role
+    API->>API: Authorize operation and derive store context
+    User->>UI: Log out
+    UI->>UI: Clear token and tenant data
+```
+
+The registration endpoint is public and creates the first Admin for a new store. Registration currently redirects the user to the login screen rather than automatically signing them in.
+
+## Multi-Tenant Architecture
+
+- `stores` holds store profiles.
+- `users.store_id` links each Admin or Staff account to a store.
+- Medicines, batches, suppliers, purchases, and sales have a store relationship.
+- Controllers obtain the store ID from the authenticated user principal and pass it to store-scoped services.
+- Record lookups and mutations use both the record ID and authenticated store ID.
+- The database schema defines foreign keys and indexes for the tenant relationships.
+
+### Database overview
+
+| Table                          | Purpose and relationships                                        |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `stores`                       | Store name, owner, contact details, address, license, and status |
+| `users`                        | Admin and Staff accounts; each user references a store           |
+| `medicines`                    | Store-specific medicine catalog                                  |
+| `medicine_batches`             | Store-specific stock batches linked to medicines                 |
+| `suppliers`                    | Store-specific supplier records                                  |
+| `purchases` / `purchase_items` | Purchase headers and their line-item snapshots                   |
+| `sales` / `sale_items`         | Sales headers and their line-item snapshots                      |
+
+The purchase and sale line-item tables store transaction details. They are linked to their respective transaction headers; their item rows are not modeled as foreign-key links to medicine records.
+
+### Current authorization note
+
+The frontend limits Reports & Analytics to Admin users, and the dashboard report data is scoped to the authenticated store. However, `GET /api/reports/dashboard` is currently authenticated and tenant-scoped but does **not** enforce Admin-only access in the backend. Do not treat the UI restriction as an API security boundary; add a backend role check if reports must be restricted to Admins.
+
+## Authentication and Security
+
+- Passwords are hashed with BCrypt.
+- Login issues a signed JWT. The configured token lifetime is 24 hours.
+- The frontend sends the token in the `Authorization: Bearer ...` header and persists it in browser `localStorage` so the session can be restored after refresh.
+- The backend uses stateless Spring Security and validates JWTs on protected requests.
+- Registration and login are public; business APIs require authentication, with role checks on selected Admin operations.
+- Store profile reads use the authenticated user's store; profile updates are Admin-only.
+- Public Staff registration is disabled.
+
+The frontend API client currently targets `http://localhost:8080/api`; the local Vite origin on port `5173` is allowed by backend CORS configuration.
+
+## Project Structure
+
+```text
 medical-store-inventory-system/
-├── backend/                               # Spring Boot Application
-│   ├── pom.xml                            # Maven dependencies (Web, JPA, Security, MySQL, JJWT)
-│   ├── schema.sql                         # MySQL database & table creation script
+├── backend/
+│   ├── schema.sql
+│   ├── schema/
+│   │   └── migration/
+│   │       └── V2__multitenant.sql
+│   ├── pom.xml
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/medstore/
-│       │   │   ├── MedicalStoreApplication.java   # Spring Boot entry point
-│       │   │   ├── config/
-│       │   │   │   ├── SecurityConfig.java        # Security filter chain, CORS & endpoint authorization
-│       │   │   │   └── DataInitializer.java       # Auto-seeds default Admin & Staff accounts
-│       │   │   ├── controller/
-│       │   │   │   ├── AuthController.java        # /api/auth (signup, login, me)
-│       │   │   │   ├── AdminUserController.java   # /api/admin/staff (user management)
-│       │   │   │   └── StaffDashboardController.java # /api/staff/permissions
-│       │   │   ├── dto/                       # Request & Response Data Transfer Objects
-│       │   │   │   ├── SignupRequest.java
-│       │   │   │   ├── LoginRequest.java
-│       │   │   │   ├── AuthResponse.java
-│       │   │   │   ├── UserDto.java
-│       │   │   │   ├── CreateStaffRequest.java
-│       │   │   │   └── ApiResponse.java
-│       │   │   ├── exception/
-│       │   │   │   └── GlobalExceptionHandler.java # Centralized JSON error response handler
-│       │   │   ├── model/
-│       │   │   │   ├── Role.java              # Enum: ROLE_ADMIN, ROLE_STAFF
-│       │   │   │   └── User.java              # JPA Entity for MySQL 'users' table
-│       │   │   ├── repository/
-│       │   │   │   └── UserRepository.java    # Spring Data JPA queries
-│       │   │   ├── security/
-│       │   │   │   ├── CustomUserDetails.java
-│       │   │   │   ├── CustomUserDetailsService.java
-│       │   │   │   ├── JwtAuthenticationEntryPoint.java
-│       │   │   │   ├── JwtAuthenticationFilter.java  # Validates Bearer token on requests
-│       │   │   │   └── JwtUtil.java               # Generates & parses HMAC-SHA256 JWTs
-│       │   │   └── service/
-│       │   │       ├── AuthService.java           # Signup & login business logic
-│       │   │       └── AdminUserService.java      # Staff creation & account control
+│       │   │   ├── config/       # Spring Security and application setup
+│       │   │   ├── controller/   # REST endpoints
+│       │   │   ├── dto/          # API request and response types
+│       │   │   ├── model/        # JPA entities
+│       │   │   ├── repository/   # Spring Data repositories
+│       │   │   ├── security/     # JWT and authenticated principal
+│       │   │   └── service/      # Business and tenant-scoped operations
 │       │   └── resources/
-│       │       └── application.properties     # MySQL datasource & JWT configuration
-│       └── test/
-│           └── java/com/medstore/
-│               └── AuthServiceTest.java       # Unit tests for signup, duplicate check & BCrypt
-│
-├── src/                                   # React.js Frontend Application
-│   ├── App.jsx                            # Main layout & route controller
-│   ├── main.jsx                           # React root with StoreProvider
-│   ├── components/
-│   │   ├── Navbar.jsx                     # Top navigation, live clock & user role pill
-│   │   ├── Sidebar.jsx                    # Role-aware sidebar navigation
-│   │   ├── Modal.jsx                      # Reusable dialog modal
-│   │   ├── Toast.jsx                      # Floating alert notifications
-│   │   ├── StatsCard.jsx                  # KPI metric card
-│   │   ├── Badge.jsx                      # Stock & expiry status badges
-│   │   └── InvoiceModal.jsx               # Printable tax invoice receipt
-│   ├── context/
-│   │   └── StoreContext.jsx               # Master React context with JWT auth integration
-│   ├── pages/
-│   │   ├── LoginPage.jsx                  # Login & Staff Registration tabs
-│   │   ├── DashboardPage.jsx              # Role-aware control center
-│   │   ├── MedicinesPage.jsx              # Medicine master catalog (Admin add/edit/delete; Staff view)
-│   │   ├── InventoryPage.jsx              # Batch lot & expiry tracker (locked expired batches)
-│   │   ├── SalesPage.jsx                  # Point of sale & billing counter
-│   │   ├── PurchasesPage.jsx              # Stock procurement (Admin only)
-│   │   ├── SuppliersPage.jsx              # Distributor directory (Admin manage; Staff view)
-│   │   ├── ReportsPage.jsx                # Financial analytics & turnover (Admin only)
-│   │   └── StaffManagementPage.jsx        # User & staff credential management (Admin only)
-│   ├── services/
-│   │   └── api.js                         # Centralized fetch client communicating with backend
-│   └── utils/
-│       └── formatters.js                  # Currency (₹), date, and expiry calculation helpers
-├── index.html
+│       │       └── application.properties
+│       └── test/java/com/medstore/
+├── public/                       # Static frontend assets
+├── src/
+│   ├── components/               # Shared UI components
+│   ├── context/                  # Authentication and store data state
+│   ├── data/                     # Shared static UI data
+│   ├── pages/                    # Application screens
+│   ├── services/                 # HTTP API client
+│   ├── utils/                    # Formatting helpers
+│   ├── App.jsx
+│   └── main.jsx
 ├── package.json
-├── tailwind.config.js
-└── vite.config.js
+└── README.md
 ```
 
----
+The frontend selects screens through application state in `App.jsx`; it does not currently use a URL-based router.
 
-## 🔐 Authentication & Role-Based Access Control (RBAC)
+## Prerequisites
 
-### **Role Permissions Matrix**
+- Java Development Kit (JDK) 17
+- Maven
+- Node.js and npm
+- MySQL Server and MySQL command-line client
+- Git
 
-| Feature / Operation | Administrator (`ROLE_ADMIN`) | Staff / Pharmacist (`ROLE_STAFF`) | Enforcement |
-| :--- | :---: | :---: | :--- |
-| **Login to System** | ✅ Yes | ✅ Yes | Spring Security DB Auth |
-| **Point of Sale (Billing Counter)** | ✅ Yes | ✅ Yes | Both roles authorized |
-| **View Medicines & Search Batches** | ✅ Yes | ✅ Yes | Both roles authorized |
-| **Add / Edit / Delete Medicines** | ✅ Full Access | ❌ Restricted | UI action hidden & backend protected |
-| **Inward Stock Purchases** | ✅ Full Access | ❌ Restricted | Admin only tab in sidebar |
-| **Manage Suppliers** | ✅ Full Access | ❌ Read Only | UI action hidden & backend protected |
-| **View Financial Reports & Margins** | ✅ Full Access | ❌ Blocked | Route guard & permission notice |
-| **Staff & User Account Management** | ✅ Full Access | ❌ Blocked | Backend `@PreAuthorize("hasAuthority('ROLE_ADMIN')")` |
+## Database setup
 
----
+The application uses the `medical_store_db` database. Choose **one** of the following setup paths.
 
-## 👤 Initial Admin Account & Staff Account Setup
+### Fresh database
 
-### **How the First Admin Account is Created (Task 6)**
-1. **Automated Seeding (`DataInitializer.java`):**
-   - On the very first startup of the Spring Boot application, `DataInitializer` checks the MySQL database.
-   - If no user with `ROLE_ADMIN` exists, it automatically creates the primary Administrator account:
-     - **Email:** `admin@medstore.com`
-     - **Password:** `Admin@123`
-     - **Role:** `ROLE_ADMIN`
-     - **Password Hashing:** Encrypted via BCrypt (`$2a$10$...`) before saving to MySQL.
-2. **Database Script (`backend/schema.sql`):**
-   - Alternatively, you can execute `backend/schema.sql` in MySQL Workbench or phpMyAdmin to pre-populate the initial Admin account.
+From the repository root in **Command Prompt (`cmd.exe`)**, run the schema script. It creates the database and application tables:
 
-### **How Public Staff Accounts are Created**
-- Anyone can click the **"Register (Staff)"** tab on the Login page.
-- Fields: Full Name, Email, Phone, Password, Confirm Password.
-- **Security Rule:** Public signup strictly assigns `ROLE_STAFF`. Users **cannot** select or elevate themselves to `ROLE_ADMIN`.
-- System enforces validation: passwords must match, minimum 6 characters, and duplicate emails are rejected.
+```cmd
+mysql -u YOUR_MYSQL_USER -p < backend\schema.sql
+```
 
-### **How Administrator Creates & Manages Staff Accounts**
-- Log in as Admin (`admin@medstore.com`).
-- Navigate to **"Staff & Users"** in the sidebar.
-- Click **"+ Add New Staff"** to create a staff account directly.
-- The Administrator can also **Activate/Deactivate** any staff member with one click or **Delete** former staff accounts.
+The script creates no sample users. Register a store through the application to create its first Admin.
 
----
+### Existing database created from the original single-tenant schema
 
-## 🛠️ Step-by-Step Installation & Running Guide
+> **Important: Back up your existing database before migration.** Store the backup securely outside the repository; it may contain private business data.
 
-### **Step 1: Configure & Start MySQL Database**
-1. Ensure your MySQL server service is running on port `3306`.
-2. Create the database (or let Spring Boot create it automatically):
-   ```sql
-   CREATE DATABASE IF NOT EXISTS medical_store_db;
-   ```
-3. Open `backend/src/main/resources/application.properties` and verify your MySQL credentials:
-   ```properties
-   spring.datasource.url=jdbc:mysql://localhost:3306/medical_store_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-   spring.datasource.username=root
-   spring.datasource.password=root
-   ```
-   *(Change `root` to your MySQL username and password if different, or set environment variables `DB_USERNAME` and `DB_PASSWORD`).*
+From the repository root in **Command Prompt (`cmd.exe`)**, make a backup:
 
----
+```cmd
+mysqldump -u YOUR_MYSQL_USER -p medical_store_db > medical_store_db_before_multitenant.sql
+```
 
-### **Step 2: Start the Spring Boot Backend**
-1. Open a terminal in the `backend` folder:
-   ```bash
-   cd "d:\Project A\medical-store-inventory-system\backend"
-   ```
-2. Build and run the backend using Maven:
-   ```bash
-   mvn spring-boot:run
-   ```
-   *(Or open `backend/pom.xml` in IntelliJ IDEA / Eclipse / VS Code and click Run on `MedicalStoreApplication.java`).*
-3. The backend will start on **http://localhost:8080**.
-   - You will see the console log:
-     ```
-     Default Admin account created successfully!
-     Email:    admin@medstore.com
-     Password: Admin@123
-     Role:     ROLE_ADMIN
-     ```
+After confirming the backup, apply the one-time migration:
 
----
+```cmd
+mysql -u YOUR_MYSQL_USER -p < backend\schema\migration\V2__multitenant.sql
+```
 
-### **Step 3: Start the React Frontend**
-1. Open a new terminal in the project root directory:
-   ```bash
-   cd "d:\Project A\medical-store-inventory-system"
-   ```
-2. Run the development server:
-   ```bash
-   npm run dev
-   ```
-3. Open your browser and navigate to:
-   ```
-   http://localhost:3000
-   ```
+This migration is for the original schema, which contained a `users` table without a `store_id`. It preserves user rows and password hashes, creates a separate legacy store, and assigns the old users to that store. Its legacy profile contains placeholder contact/address values that should be updated in Store Settings. The original schema did not define the business tables; Hibernate's configured `ddl-auto=update` creates missing entity tables when the backend starts.
 
----
+**Run this migration once only.** It alters `users` and is not safe to rerun. Do not use it on a fresh database or on a database that has already been migrated. If the existing database has a different or partially migrated schema, inspect it and prepare a reviewed migration before starting the application. Do not run `schema.sql` as a substitute for migrating an existing database.
 
-## 🧪 Testing Guide for Project Viva & Demonstration
+## Environment variables
 
-### **Test 1: Public Staff Signup**
-1. Go to the login page and click **"Register (Staff)"**.
-2. Fill in:
-   - **Name:** Rohit Sharma
-   - **Email:** `rohit@medstore.com`
-   - **Password:** `Rohit@123`
-   - **Confirm Password:** `Rohit@123`
-3. Click **"Register as Staff"**.
-4. Notice you are logged in immediately as **Rohit Sharma**, with the **STAFF** badge displayed in the sidebar.
-5. In MySQL, run `SELECT * FROM users;` to show your professor that the password is stored as a secure BCrypt hash (`$2a$10$...`) and role is `ROLE_STAFF`.
+The backend reads these variables from its process environment. Set them in the terminal or IDE run configuration that launches Spring Boot; do not commit real values to the repository.
 
-### **Test 2: Duplicate Email Rejection**
-1. Try signing up again using `rohit@medstore.com`.
-2. The backend rejects the request with HTTP 400: `"Email 'rohit@medstore.com' is already registered. Please log in or use another email."`
+| Variable      | Required | Purpose                                              |
+| ------------- | -------- | ---------------------------------------------------- |
+| `DB_USERNAME` | Yes      | MySQL account used by the backend                    |
+| `DB_PASSWORD` | Yes      | Password for that MySQL account                      |
+| `JWT_SECRET`  | Yes      | JWT signing key; provide at least 32 bytes for HS256 |
 
-### **Test 3: Incorrect Password Handling**
-1. Log out.
-2. Enter email `admin@medstore.com` and an incorrect password (e.g., `WrongPass123`).
-3. Click Sign In. The system displays: `"Invalid email or password."`
+The database URL, database name, port, and token lifetime are configured in `backend/src/main/resources/application.properties`. The frontend API base URL is configured in `src/services/api.js`.
 
-### **Test 4: Staff Role Restrictions**
-1. Log in as Staff (`staff@medstore.com` / `Staff@123`).
-2. Notice:
-   - "Staff & Users" management tab is **hidden** from the sidebar.
-   - "Stock Purchases" tab is **hidden**.
-   - In "Medicines", the "+ Add New Medicine" and Delete buttons are **hidden**.
-   - Staff can freely access the **Sales (Billing POS)** counter, add medicines, and complete sales receipts.
+## Run the application
 
-### **Test 5: Administrator Account & Staff Management**
-1. Log out and log in as Admin (`admin@medstore.com` / `Admin@123`).
-2. Notice:
-   - Full dashboard access, financial turnover, KPI cards, and reports.
-   - Click **"Staff & Users"** in the sidebar.
-   - View the table of all registered staff accounts.
-   - Click **"Deactivate"** or **"Add New Staff"** to demonstrate complete administrative control.
+### Backend
 
----
+Open PowerShell at the repository root. Set the three required environment variables locally, then run:
 
-## 🏆 Project Viva Highlights for Mentor & External Examiner
+```powershell
+Set-Location .\backend
+mvn clean compile
+mvn test
+mvn spring-boot:run
+```
 
-1. **Why BCrypt over MD5 or SHA-256?**
-   - BCrypt includes a cryptographic salt and work-factor (10 rounds) that protects against rainbow table attacks and brute force.
-2. **Why JWT (JSON Web Tokens)?**
-   - Stateless authentication allows horizontal scaling without storing server-side session state in memory.
-3. **Defense in Depth:**
-   - Both frontend UI guards and backend Spring Security method-level annotations (`@PreAuthorize("hasAuthority('ROLE_ADMIN')")`) are implemented to ensure APIs cannot be bypassed by external tools like Postman or cURL.
+The API listens at `http://localhost:8080`.
+
+### Frontend
+
+Open a second terminal at the repository root:
+
+```powershell
+npm install
+npm run dev
+```
+
+Open the Vite URL printed in the terminal (normally `http://localhost:5173`). Register a store to create its first Admin, then log in. There are no seeded demo accounts.
+
+### Production frontend build
+
+From the repository root:
+
+```powershell
+npm run build
+```
+
+To preview the generated build locally:
+
+```powershell
+npm run preview
+```
+
+## Tests and build status
+
+Last verified locally during this implementation:
+
+| Check               | Result                                                   |
+| ------------------- | -------------------------------------------------------- |
+| `mvn clean compile` | Passed                                                   |
+| `mvn test`          | Passed: 12 tests, 0 failures, 0 errors                   |
+| `npm run build`     | Passed                                                   |
+| `git diff --check`  | Passed; Git emitted only line-ending conversion warnings |
+
+The backend tests include registration success/password mismatch/duplicate email cases, request validation, and service-level tenant-scope checks for medicines, inventory batches, suppliers, purchases, sales, and staff. The tenant tests use mocked repositories; they are not HTTP integration tests. No live MySQL/API or browser end-to-end run has been completed, so deployment-specific behavior still needs local verification.
+
+## Future Enhancements
+
+- Add authenticated HTTP integration tests using a disposable MySQL-compatible test database.
+- Enforce Admin-only access to financial reports at the backend if that is the intended policy.
+- Add browser-level tests for registration, login, role visibility, and operational workflows.
+- Add optional barcode support and configurable notification delivery for low stock and expiry.
+- Add deployment documentation and production environment configuration.
+
+## Team and Project Information
+
+- **Team:** G72
+- **Program:** B.Tech Computer Science & Engineering
+- **Project type:** Academic project
+
+No separate open-source license file is currently included in the repository.

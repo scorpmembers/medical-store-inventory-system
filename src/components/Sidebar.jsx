@@ -9,10 +9,9 @@ import {
   BarChart3,
   LogOut,
   X,
-  AlertTriangle,
-  RotateCcw,
   UserCheck,
-  ShieldCheck
+  ShieldCheck,
+  Settings,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
@@ -23,8 +22,8 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
     expiredBatches,
     lowStockMedicines,
     logout,
-    resetToSampleData,
     user,
+    storeProfile,
     isAdmin,
     isStaff
   } = useStore();
@@ -51,6 +50,7 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
     { id: 'suppliers', label: 'Suppliers Directory', icon: Users },
     { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
     { id: 'staff-management', label: 'Staff & Users', icon: UserCheck, badge: 'Admin', badgeColor: 'bg-indigo-100 text-indigo-700' },
+    { id: 'store-settings', label: 'Store Settings', icon: Settings },
   ];
 
   // If user is Admin, they get full access; staff gets operational billing and catalog
@@ -108,7 +108,7 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
         <div className="px-4 py-3 mx-3 my-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-slate-800 truncate">
-              {user?.storeName || 'City Care Pharmacy'}
+              {storeProfile?.storeName || user?.storeName || 'Your Store'}
             </span>
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
@@ -120,9 +120,11 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
               {isAdmin ? 'ADMIN' : 'STAFF'}
             </span>
           </div>
-          <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-            Lic: {user?.licenseNo || 'DL-PH-2024'}
-          </div>
+          {(storeProfile?.drugLicenseNumber || user?.licenseNo) && (
+            <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+              Lic: {storeProfile?.drugLicenseNumber || user?.licenseNo}
+            </div>
+          )}
         </div>
 
         {/* Navigation Items */}
@@ -166,22 +168,6 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
 
         {/* Footer Actions */}
         <div className="p-3 border-t border-slate-200 space-y-1.5 bg-slate-50/50">
-          {/* Reset Demo Data button (Admin only) */}
-          {isAdmin && (
-            <button
-              onClick={() => {
-                if (window.confirm('Reset all demo data (medicines, batches, sales, suppliers) back to default initial state?')) {
-                  resetToSampleData();
-                }
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:text-teal-700 hover:bg-slate-100 rounded-lg transition-colors"
-              title="Reset to fresh demo sample data"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-              <span>Reset Demo Data</span>
-            </button>
-          )}
-
           {/* User logout */}
           <div className="pt-1 flex items-center justify-between px-2">
             <div className="truncate pr-2">

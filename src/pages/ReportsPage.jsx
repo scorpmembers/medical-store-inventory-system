@@ -58,7 +58,7 @@ export default function ReportsPage() {
   const slowMoving = medicines
     .filter((m) => !medicineSalesMap[m.name] || medicineSalesMap[m.name].unitsSold <= 1)
     .map((m) => {
-      const stock = batches.filter((b) => b.medicineId === m.id).reduce((s, b) => s + b.quantity, 0);
+      const stock = batches.filter((b) => String(b.medicineId) === String(m.id)).reduce((s, b) => s + b.quantity, 0);
       return {
         id: m.id,
         name: m.name,
@@ -85,7 +85,24 @@ export default function ReportsPage() {
   };
 
   const handleExportCSV = () => {
-    showToast('Report CSV export completed (Demo simulation).', 'success', 'Exported');
+    const columns = ['Invoice', 'Date', 'Customer', 'Payment Method', 'Total'];
+    const rows = sales.map((sale) => [
+      sale.invoiceNumber,
+      sale.date,
+      sale.customerName,
+      sale.paymentMethod,
+      sale.grandTotal,
+    ]);
+    const csvValue = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const csv = [columns, ...rows].map((row) => row.map(csvValue).join(',')).join('\r\n');
+    const file = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'store-sales-report.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Sales report downloaded.', 'success', 'Report Exported');
   };
 
   if (!isAdmin) {
@@ -194,7 +211,7 @@ export default function ReportsPage() {
               Current Week
             </span>
           </div>
-          <SalesBarChart height={220} />
+          <SalesBarChart height={220} sales={sales} />
         </div>
 
         {/* Monthly Trend */}
@@ -212,7 +229,7 @@ export default function ReportsPage() {
               H2 2026
             </span>
           </div>
-          <MonthlyRevenueChart />
+          <MonthlyRevenueChart sales={sales} purchases={purchases} />
         </div>
       </div>
 

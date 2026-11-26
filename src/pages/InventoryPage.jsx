@@ -45,7 +45,7 @@ export default function InventoryPage({ setActivePage }) {
     sellingPrice: '',
     mfgDate: new Date().toISOString().split('T')[0],
     expiryDate: '',
-    supplierName: suppliers[0]?.name || 'Apex Health Logistics'
+    supplierName: suppliers[0]?.name || ''
   };
 
   const [formData, setFormData] = useState(initialBatchForm);
@@ -78,7 +78,7 @@ export default function InventoryPage({ setActivePage }) {
     setIsAddBatchOpen(true);
   };
 
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!formData.batchNumber || !formData.medicineId || !formData.quantity || !formData.expiryDate) {
       return;
@@ -100,10 +100,9 @@ export default function InventoryPage({ setActivePage }) {
     }
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingBatch) {
-      deleteBatch(deletingBatch.batchNumber);
-      setDeletingBatch(null);
+      if (await deleteBatch(deletingBatch.batchNumber)) setDeletingBatch(null);
     }
   };
 

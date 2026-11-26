@@ -2,9 +2,24 @@ import React from 'react';
 import { Printer, CheckCircle, Pill, Phone, MapPin, FileText } from 'lucide-react';
 import Modal from './Modal';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import { useStore } from '../context/StoreContext';
 
 export default function InvoiceModal({ isOpen, onClose, sale }) {
+  const { storeProfile, user } = useStore();
   if (!sale) return null;
+
+  const storeName = storeProfile?.storeName || user?.storeName || 'Medical Store';
+  const storeAddress = [
+    storeProfile?.address || user?.address,
+    storeProfile?.city,
+    storeProfile?.state,
+    storeProfile?.pincode,
+  ].filter(Boolean).join(', ');
+  const storeCompliance = [
+    storeProfile?.phone,
+    storeProfile?.drugLicenseNumber && `Drug Lic: ${storeProfile.drugLicenseNumber}`,
+    storeProfile?.gstin && `GSTIN: ${storeProfile.gstin}`,
+  ].filter(Boolean).join(' | ');
 
   const handlePrint = () => {
     window.print();
@@ -44,16 +59,16 @@ export default function InvoiceModal({ isOpen, onClose, sale }) {
                 <Pill className="w-5 h-5" />
               </div>
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                City Care Pharmacy
+                {storeName}
               </h2>
             </div>
             <p className="text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1">
               <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              Shop #12, Ground Floor, MediCentre Market, New Delhi - 110025
+              {storeAddress || 'Store address not provided'}
             </p>
             <p className="text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1 mt-0.5">
               <Phone className="w-3.5 h-3.5 text-slate-400" />
-              +91 98110 23456 | Drug Lic: DL-PH-2024-8890 | GSTIN: 07AABCC1234D1Z9
+              {storeCompliance || 'Store contact details not provided'}
             </p>
           </div>
 
@@ -161,7 +176,7 @@ export default function InvoiceModal({ isOpen, onClose, sale }) {
 
         {/* Footer Note */}
         <div className="border-t border-slate-100 pt-3 text-[11px] text-slate-400 text-center flex flex-col items-center">
-          <p className="font-medium text-slate-600">Thank you for visiting City Care Pharmacy! Wish you good health.</p>
+          <p className="font-medium text-slate-600">Thank you for visiting {storeName}! Wish you good health.</p>
           <p className="mt-0.5">Please consult registered doctor before consuming medicines. Keep out of reach of children.</p>
         </div>
       </div>

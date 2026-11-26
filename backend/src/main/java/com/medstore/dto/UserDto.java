@@ -12,6 +12,8 @@ public class UserDto {
     private String email;
     private String phone;
     private Role role;
+    private Long storeId;
+    private String storeName;
     private boolean active;
     private LocalDateTime createdAt;
 
@@ -24,6 +26,10 @@ public class UserDto {
         this.email = user.getEmail();
         this.phone = user.getPhone();
         this.role = user.getRole();
+        if (user.getStore() != null) {
+            this.storeId = user.getStore().getId();
+            this.storeName = user.getStore().getStoreName();
+        }
         this.active = user.isActive();
         this.createdAt = user.getCreatedAt();
     }
@@ -66,6 +72,22 @@ public class UserDto {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Long getStoreId() {
+        return storeId;
+    }
+
+    public void setStoreId(Long storeId) {
+        this.storeId = storeId;
+    }
+
+    public String getStoreName() {
+        return storeName;
+    }
+
+    public void setStoreName(String storeName) {
+        this.storeName = storeName;
     }
 
     public boolean isActive() {

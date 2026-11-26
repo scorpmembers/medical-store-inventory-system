@@ -27,22 +27,40 @@ public class JwtUtil {
 
     public String generateToken(Authentication authentication) {
         CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
-        return generateToken(userPrincipal.getUsername(), userPrincipal.getUser().getRole(), userPrincipal.getName(), userPrincipal.getId());
+        return generateToken(
+                userPrincipal.getUsername(),
+                userPrincipal.getUser().getRole(),
+                userPrincipal.getName(),
+                userPrincipal.getId(),
+                userPrincipal.getStoreId(),
+                userPrincipal.getStoreName()
+        );
     }
 
     public String generateToken(String email, Role role, String name, Long id) {
+        return generateToken(email, role, name, id, null, null);
+    }
+
+    public String generateToken(String email, Role role, String name, Long id, Long storeId, String storeName) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(email)
                 .claim("id", id)
                 .claim("name", name)
                 .claim("role", role.name())
                 .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(expiryDate);
+
+        if (storeId != null) {
+            builder.claim("storeId", storeId);
+        }
+        if (storeName != null) {
+            builder.claim("storeName", storeName);
+        }
+
+        return builder.signWith(getSigningKey(), SignatureAlgorithm.HS256).compact();
     }
 
     public String getEmailFromToken(String token) {
@@ -63,6 +81,30 @@ public class JwtUtil {
                 .getBody();
 
         return claims.get("role", String.class);
+    }
+
+    public Long getStoreIdFromToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        Object storeIdObj = claims.get("storeId");
+        if (storeIdObj instanceof Number) {
+            return ((Number) storeIdObj).longValue();
+        }
+        return null;
+    }
+
+    public String getStoreNameFromToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.get("storeName", String.class);
     }
 
     public boolean validateToken(String authToken) {

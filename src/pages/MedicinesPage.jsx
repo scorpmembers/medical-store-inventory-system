@@ -112,7 +112,7 @@ export default function MedicinesPage({ setActivePage }) {
   };
 
   // Handle Add Medicine Submit
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
@@ -124,7 +124,7 @@ export default function MedicinesPage({ setActivePage }) {
       rackLocation: formData.rackLocation,
       unit: formData.unit,
       minStockAlert: Number(formData.minStockAlert) || 15,
-      manufacturer: 'Local Pharma Supplies',
+      manufacturer: '',
       description: formData.description,
     };
 
@@ -139,16 +139,15 @@ export default function MedicinesPage({ setActivePage }) {
       };
     }
 
-    addMedicine(payload);
-    setIsAddModalOpen(false);
+    if (await addMedicine(payload)) setIsAddModalOpen(false);
   };
 
   // Handle Edit Medicine Submit
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!editingMedicine || !formData.name.trim()) return;
 
-    updateMedicine(editingMedicine.id, {
+    const updated = await updateMedicine(editingMedicine.id, {
       name: formData.name.trim(),
       genericName: formData.genericName.trim(),
       category: formData.category,
@@ -159,14 +158,13 @@ export default function MedicinesPage({ setActivePage }) {
       description: formData.description,
     });
 
-    setEditingMedicine(null);
+    if (updated) setEditingMedicine(null);
   };
 
   // Handle Delete Confirm
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingMedicine) {
-      deleteMedicine(deletingMedicine.id);
-      setDeletingMedicine(null);
+      if (await deleteMedicine(deletingMedicine.id)) setDeletingMedicine(null);
     }
   };
 

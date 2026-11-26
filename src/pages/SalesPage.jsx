@@ -49,9 +49,15 @@ export default function SalesPage() {
   // Cart Items
   const [cartItems, setCartItems] = useState([]);
 
+  React.useEffect(() => {
+    if (medicines.length > 0 && !medicines.some((medicine) => String(medicine.id) === String(selectedMedicineId))) {
+      setSelectedMedicineId(String(medicines[0].id));
+    }
+  }, [medicines, selectedMedicineId]);
+
   // Batches for the currently selected medicine
   const availableBatchesForMed = useMemo(() => {
-    return batches.filter((b) => b.medicineId === selectedMedicineId);
+    return batches.filter((b) => String(b.medicineId) === String(selectedMedicineId));
   }, [batches, selectedMedicineId]);
 
   // Active batch object
@@ -115,7 +121,7 @@ export default function SalesPage() {
       return;
     }
 
-    const med = medicines.find((m) => m.id === selectedMedicineId);
+    const med = medicines.find((m) => String(m.id) === String(selectedMedicineId));
 
     if (existingCartItem) {
       setCartItems((prev) =>
@@ -157,7 +163,7 @@ export default function SalesPage() {
   const grandTotal = Math.max(0, subtotal - discount);
 
   // Complete Checkout
-  const handleCompleteSale = (e) => {
+  const handleCompleteSale = async (e) => {
     e.preventDefault();
     if (cartItems.length === 0) {
       showToast('Please add at least one medicine to the bill before checkout.', 'error');
@@ -176,7 +182,7 @@ export default function SalesPage() {
       grandTotal
     };
 
-    const recordedSale = addSale(salePayload);
+    const recordedSale = await addSale(salePayload);
     if (recordedSale) {
       // Clear form
       setCartItems([]);

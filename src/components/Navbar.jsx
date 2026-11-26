@@ -66,6 +66,8 @@ export default function Navbar({ activePage, setActivePage, setIsMobileOpen }) {
         return 'Reports & Performance Analytics';
       case 'staff-management':
         return 'Staff & User Access Management';
+      case 'store-settings':
+        return 'Store Settings';
       default:
         return 'Dashboard';
     }
@@ -100,7 +102,7 @@ export default function Navbar({ activePage, setActivePage, setIsMobileOpen }) {
             </span>
           </div>
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-            <span>MedStore IMS</span>
+            <span className="max-w-40 truncate">{user?.storeName || 'Medical Store'}</span>
             <ChevronRight className="w-3 h-3 text-slate-400" />
             <span className="text-teal-700 font-medium capitalize">
               {activePage.replace('-', ' ')}

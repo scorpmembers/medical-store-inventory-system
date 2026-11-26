@@ -55,16 +55,16 @@ export default function PurchasesPage({ setActivePage }) {
   };
 
   // Submit Purchase
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.supplierId || !formData.medicineId || !formData.batchNumber || !formData.quantity || !formData.purchasePrice) {
       return;
     }
 
-    const selectedSup = suppliers.find((s) => s.id === formData.supplierId);
-    const selectedMed = medicines.find((m) => m.id === formData.medicineId);
+    const selectedSup = suppliers.find((s) => String(s.id) === String(formData.supplierId));
+    const selectedMed = medicines.find((m) => String(m.id) === String(formData.medicineId));
 
-    addPurchase({
+    const created = await addPurchase({
       supplierId: formData.supplierId,
       supplierName: selectedSup ? selectedSup.name : 'Unknown Supplier',
       invoiceNumber: formData.invoiceNumber || `PUR-${Date.now().toString().slice(-5)}`,
@@ -78,7 +78,7 @@ export default function PurchasesPage({ setActivePage }) {
       expiryDate: formData.expiryDate || '2028-12-31',
     });
 
-    setIsAddModalOpen(false);
+    if (created) setIsAddModalOpen(false);
   };
 
   // Filtered Purchases History

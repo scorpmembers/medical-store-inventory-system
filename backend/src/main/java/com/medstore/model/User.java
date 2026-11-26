@@ -6,12 +6,20 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users", uniqueConstraints = {
     @UniqueConstraint(columnNames = "email")
+}, indexes = {
+    @Index(name = "idx_users_email", columnList = "email"),
+    @Index(name = "idx_users_store_id", columnList = "store_id"),
+    @Index(name = "idx_users_role", columnList = "role")
 })
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "store_id", nullable = false)
+    private Store store;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -41,11 +49,12 @@ public class User {
     public User() {
     }
 
-    public User(String name, String email, String password, Role role) {
+    public User(String name, String email, String password, Role role, Store store) {
         this.name = name;
         this.email = email;
         this.password = password;
         this.role = role;
+        this.store = store;
         this.active = true;
     }
 
@@ -67,6 +76,14 @@ public class User {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Store getStore() {
+        return store;
+    }
+
+    public void setStore(Store store) {
+        this.store = store;
     }
 
     public String getName() {

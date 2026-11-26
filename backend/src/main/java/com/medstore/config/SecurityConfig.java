@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -53,15 +52,24 @@ public class SecurityConfig {
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public Authentication Endpoints
-                .requestMatchers("/api/auth/**").permitAll()
-                // Admin Only Endpoints
-                .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
-                // Staff & Admin Allowed Endpoints
-                .requestMatchers("/api/staff/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_STAFF")
-                // Error endpoint
+                // Public endpoints
+                .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers("/api/auth/register-store").permitAll()
                 .requestMatchers("/error").permitAll()
-                // All other requests require authentication
+                // Admin-only endpoints
+                .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
+                // Store profile (admin & staff read, admin writes — enforced at method level)
+                .requestMatchers("/api/stores/**").authenticated()
+                // Business endpoints — authenticated (method-level @PreAuthorize handles role restrictions)
+                .requestMatchers("/api/medicines/**").authenticated()
+                .requestMatchers("/api/inventory/**").authenticated()
+                .requestMatchers("/api/suppliers/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers("/api/purchases/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers("/api/sales/**").authenticated()
+                .requestMatchers("/api/reports/**").authenticated()
+                // Legacy staff permission endpoint
+                .requestMatchers("/api/staff/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_STAFF")
+                // Everything else requires authentication
                 .anyRequest().authenticated()
             );
 
@@ -73,7 +81,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Allow Vite dev servers on port 3000, 5173, etc.
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:3000",
             "http://localhost:5173",

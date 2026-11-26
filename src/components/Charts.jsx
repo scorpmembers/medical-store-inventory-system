@@ -4,22 +4,28 @@ import { formatCurrency } from '../utils/formatters';
 /**
  * 7-Day Sales Overview Bar Chart
  */
-export function SalesBarChart({ data = [], height = 220 }) {
+const weeklySalesData = (sales) => Array.from({ length: 7 }, (_, index) => {
+  const date = new Date();
+  date.setDate(date.getDate() - 6 + index);
+  const dateKey = date.toISOString().split('T')[0];
+  const daySales = sales.filter((sale) => (sale.saleDate || sale.date) === dateKey);
+  return {
+    label: date.toLocaleDateString(undefined, { weekday: 'short' }),
+    date: date.toLocaleDateString(),
+    amount: daySales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0),
+    orders: daySales.length,
+    isToday: index === 6,
+  };
+}).filter((day, index, days) => day.amount > 0 || days.some((item) => item.amount > 0));
+
+export function SalesBarChart({ data = [], sales = [], height = 220 }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
+  const chartData = data.length > 0 ? data : weeklySalesData(sales);
+  const maxVal = Math.max(...chartData.map((d) => d.amount), 1);
 
-  // Default past 7 days data if empty
-  const defaultData = [
-    { label: 'Thu', date: '12 Nov', amount: 3200, orders: 8 },
-    { label: 'Fri', date: '13 Nov', amount: 4850, orders: 12 },
-    { label: 'Sat', date: '14 Nov', amount: 6200, orders: 16 },
-    { label: 'Sun', date: '15 Nov', amount: 3900, orders: 9 },
-    { label: 'Mon', date: '16 Nov', amount: 5120, orders: 14 },
-    { label: 'Tue', date: '17 Nov', amount: 4450, orders: 11 },
-    { label: 'Wed', date: '18 Nov (Today)', amount: 6850, orders: 18, isToday: true },
-  ];
-
-  const chartData = data.length > 0 ? data : defaultData;
-  const maxVal = Math.max(...chartData.map((d) => d.amount), 7500);
+  if (chartData.length === 0) {
+    return <p className="py-12 text-center text-xs text-slate-400">No sales recorded for this period.</p>;
+  }
 
   return (
     <div className="w-full">
@@ -90,25 +96,43 @@ export function SalesBarChart({ data = [], height = 220 }) {
 /**
  * Monthly Revenue Comparison Chart
  */
-export function MonthlyRevenueChart() {
-  const months = [
-    { month: 'Jun', revenue: 78500, purchases: 52000, profit: 26500 },
-    { month: 'Jul', revenue: 92400, purchases: 61000, profit: 31400 },
-    { month: 'Aug', revenue: 84000, purchases: 57500, profit: 26500 },
-    { month: 'Sep', revenue: 105600, purchases: 72000, profit: 33600 },
-    { month: 'Oct', revenue: 118200, purchases: 81000, profit: 37200 },
-    { month: 'Nov (Est)', revenue: 125000, purchases: 84000, profit: 41000 },
-  ];
+export function MonthlyRevenueChart({ sales = [], purchases = [] }) {
+  const today = new Date();
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(today.getFullYear(), today.getMonth() - 5 + index, 1);
+    const year = date.getFullYear();
+    const monthIndex = date.getMonth();
+    const revenue = sales
+      .filter((sale) => {
+        const saleDate = new Date(sale.saleDate || sale.date);
+        return saleDate.getFullYear() === year && saleDate.getMonth() === monthIndex;
+      })
+      .reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
+    const purchaseTotal = purchases
+      .filter((purchase) => {
+        const purchaseDate = new Date(purchase.purchaseDate || purchase.date);
+        return purchaseDate.getFullYear() === year && purchaseDate.getMonth() === monthIndex;
+      })
+      .reduce((sum, purchase) => sum + Number(purchase.totalAmount || 0), 0);
+    return {
+      month: date.toLocaleDateString(undefined, { month: 'short' }),
+      revenue,
+      purchases: purchaseTotal,
+      profit: revenue - purchaseTotal,
+    };
+  });
 
-  const maxVal = 135000;
+  if (sales.length === 0 && purchases.length === 0) {
+    return <p className="py-12 text-center text-xs text-slate-400">No sales or purchases recorded for this period.</p>;
+  }
+
+  const maxVal = Math.max(...months.map((month) => month.revenue), 1);
 
   return (
     <div className="w-full">
       <div className="space-y-4 pt-2">
         {months.map((m, idx) => {
           const revPercent = (m.revenue / maxVal) * 100;
-          const purPercent = (m.purchases / maxVal) * 100;
-
           return (
             <div key={idx} className="text-xs">
               <div className="flex justify-between items-center mb-1 text-slate-700 font-medium">
@@ -145,17 +169,24 @@ export function MonthlyRevenueChart() {
 /**
  * Category Breakdown with visual bars
  */
-export function CategoryBreakdownList({ categories = [] }) {
-  const defaultCategories = [
-    { name: 'Antibiotics', items: 12, share: 28, color: 'bg-teal-500' },
-    { name: 'Analgesics & Pain Relief', items: 15, share: 22, color: 'bg-emerald-500' },
-    { name: 'Antacids & GI Care', items: 10, share: 18, color: 'bg-sky-500' },
-    { name: 'Antidiabetic', items: 8, share: 14, color: 'bg-indigo-500' },
-    { name: 'Cardiovascular & BP', items: 9, share: 10, color: 'bg-amber-500' },
-    { name: 'Vitamins & Supplements', items: 14, share: 8, color: 'bg-rose-400' },
-  ];
+export function CategoryBreakdownList({ medicines = [] }) {
+  const colors = ['bg-teal-500', 'bg-emerald-500', 'bg-sky-500', 'bg-indigo-500', 'bg-amber-500', 'bg-rose-400'];
+  const categoryCounts = medicines.reduce((counts, medicine) => {
+    const category = medicine.category || 'Uncategorized';
+    counts[category] = (counts[category] || 0) + 1;
+    return counts;
+  }, {});
+  const totalMedicines = medicines.length;
+  const items = Object.entries(categoryCounts).map(([name, total], index) => ({
+    name,
+    items: total,
+    share: Math.round((total / totalMedicines) * 100),
+    color: colors[index % colors.length],
+  }));
 
-  const items = categories.length > 0 ? categories : defaultCategories;
+  if (items.length === 0) {
+    return <p className="py-8 text-center text-xs text-slate-400">No medicines have been added.</p>;
+  }
 
   return (
     <div className="space-y-3.5">
