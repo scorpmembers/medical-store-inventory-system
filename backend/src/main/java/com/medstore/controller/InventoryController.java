@@ -1,6 +1,7 @@
 package com.medstore.controller;
 
 import com.medstore.dto.ApiResponse;
+import com.medstore.dto.BatchResponse;
 import com.medstore.model.Batch;
 import com.medstore.security.CustomUserDetails;
 import com.medstore.service.InventoryService;
@@ -21,47 +22,51 @@ public class InventoryController {
     private InventoryService inventoryService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Batch>>> getAllBatches(
+    public ResponseEntity<ApiResponse<List<BatchResponse>>> getAllBatches(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<Batch> batches = inventoryService.getAllBatches(userDetails.getStoreId());
+        List<BatchResponse> batches = inventoryService.getAllBatches(userDetails.getStoreId()).stream()
+                .map(BatchResponse::from)
+                .toList();
         return ResponseEntity.ok(ApiResponse.success("Inventory batches retrieved", batches));
     }
 
     @GetMapping("/medicine/{medicineId}")
-    public ResponseEntity<ApiResponse<List<Batch>>> getBatchesByMedicine(
+    public ResponseEntity<ApiResponse<List<BatchResponse>>> getBatchesByMedicine(
             @PathVariable Long medicineId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<Batch> batches = inventoryService.getBatchesByMedicine(userDetails.getStoreId(), medicineId);
+        List<BatchResponse> batches = inventoryService.getBatchesByMedicine(userDetails.getStoreId(), medicineId).stream()
+                .map(BatchResponse::from)
+                .toList();
         return ResponseEntity.ok(ApiResponse.success("Batches retrieved for medicine", batches));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Batch>> getBatchById(
+    public ResponseEntity<ApiResponse<BatchResponse>> getBatchById(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Batch batch = inventoryService.getBatchById(id, userDetails.getStoreId());
-        return ResponseEntity.ok(ApiResponse.success("Batch retrieved", batch));
+        return ResponseEntity.ok(ApiResponse.success("Batch retrieved", BatchResponse.from(batch)));
     }
 
     @PostMapping("/medicine/{medicineId}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<ApiResponse<Batch>> addBatch(
+    public ResponseEntity<ApiResponse<BatchResponse>> addBatch(
             @PathVariable Long medicineId,
             @RequestBody Batch batch,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Batch created = inventoryService.addBatch(userDetails.getStoreId(), medicineId, batch);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Batch added to inventory", created));
+                .body(ApiResponse.success("Batch added to inventory", BatchResponse.from(created)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<ApiResponse<Batch>> updateBatch(
+    public ResponseEntity<ApiResponse<BatchResponse>> updateBatch(
             @PathVariable Long id,
             @RequestBody Batch batch,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Batch updated = inventoryService.updateBatch(id, userDetails.getStoreId(), batch);
-        return ResponseEntity.ok(ApiResponse.success("Batch updated successfully", updated));
+        return ResponseEntity.ok(ApiResponse.success("Batch updated successfully", BatchResponse.from(updated)));
     }
 
     @DeleteMapping("/{id}")

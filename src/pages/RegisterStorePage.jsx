@@ -25,6 +25,30 @@ const INDIA_STATES = [
   'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Chandigarh', 'Puducherry',
 ];
 
+const InputField = ({ label, name, type = 'text', placeholder, required, icon: Icon, maxLength, value, onChange }) => (
+  <div>
+    <label className="block text-xs font-semibold text-slate-700 mb-1">
+      {label} {required && <span className="text-rose-500">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <Icon className="w-4 h-4" />
+        </div>
+      )}
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className={`w-full ${Icon ? 'pl-9' : 'pl-3'} pr-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all`}
+      />
+    </div>
+  </div>
+);
+
 export default function RegisterStorePage({ onRegistered, onBackToLogin }) {
   const [step, setStep] = useState(1); // 1 = Owner Details, 2 = Store Details
   const [loading, setLoading] = useState(false);
@@ -134,30 +158,6 @@ export default function RegisterStorePage({ onRegistered, onBackToLogin }) {
     }
   };
 
-  const InputField = ({ label, name, type = 'text', placeholder, required, icon: Icon, maxLength }) => (
-    <div>
-      <label className="block text-xs font-semibold text-slate-700 mb-1">
-        {label} {required && <span className="text-rose-500">*</span>}
-      </label>
-      <div className="relative">
-        {Icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-            <Icon className="w-4 h-4" />
-          </div>
-        )}
-        <input
-          type={type}
-          name={name}
-          value={form[name]}
-          onChange={handleChange}
-          placeholder={placeholder}
-          maxLength={maxLength}
-          className={`w-full ${Icon ? 'pl-9' : 'pl-3'} pr-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all`}
-        />
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
@@ -221,12 +221,12 @@ export default function RegisterStorePage({ onRegistered, onBackToLogin }) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <InputField label="Full Name" name="ownerName" placeholder="Full name" required icon={User} maxLength={100} />
+                  <InputField label="Full Name" name="ownerName" value={form.ownerName} onChange={handleChange} placeholder="Full name" required icon={User} maxLength={100} />
                 </div>
-                <InputField label="Email Address" name="email" type="email" placeholder="owner@yourstore.com" required icon={Mail} />
-                <InputField label="Mobile Number" name="phone" placeholder="9876543210" required icon={Phone} maxLength={10} />
-                <InputField label="Password" name="password" type="password" placeholder="Min. 6 characters" required icon={Lock} />
-                <InputField label="Confirm Password" name="confirmPassword" type="password" placeholder="Re-enter password" required icon={Lock} />
+                <InputField label="Email Address" name="email" value={form.email} onChange={handleChange} type="email" placeholder="owner@yourstore.com" required icon={Mail} />
+                <InputField label="Mobile Number" name="phone" value={form.phone} onChange={handleChange} placeholder="9876543210" required icon={Phone} maxLength={10} />
+                <InputField label="Password" name="password" value={form.password} onChange={handleChange} type="password" placeholder="Min. 6 characters" required icon={Lock} />
+                <InputField label="Confirm Password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} type="password" placeholder="Re-enter password" required icon={Lock} />
               </div>
 
               <button
@@ -254,14 +254,14 @@ export default function RegisterStorePage({ onRegistered, onBackToLogin }) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <InputField label="Medical Store Name" name="storeName" placeholder="Your medical store name" required icon={Building2} maxLength={150} />
+                  <InputField label="Medical Store Name" name="storeName" value={form.storeName} onChange={handleChange} placeholder="Your medical store name" required icon={Building2} maxLength={150} />
                 </div>
-                <InputField label="Store Contact Number" name="storePhone" placeholder="Store phone / landline" icon={Phone} />
-                <InputField label="Store Email (Optional)" name="storeEmail" type="email" placeholder="store@yourstore.com" icon={Mail} />
+                <InputField label="Store Contact Number" name="storePhone" value={form.storePhone} onChange={handleChange} placeholder="Store phone / landline" icon={Phone} />
+                <InputField label="Store Email (Optional)" name="storeEmail" value={form.storeEmail} onChange={handleChange} type="email" placeholder="store@yourstore.com" icon={Mail} />
                 <div className="sm:col-span-2">
-                  <InputField label="Full Address" name="address" placeholder="Building, Street, Locality" required icon={MapPin} maxLength={255} />
+                  <InputField label="Full Address" name="address" value={form.address} onChange={handleChange} placeholder="Building, Street, Locality" required icon={MapPin} maxLength={255} />
                 </div>
-                <InputField label="City" name="city" placeholder="City" required maxLength={80} />
+                <InputField label="City" name="city" value={form.city} onChange={handleChange} placeholder="City" required maxLength={80} />
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     State <span className="text-rose-500">*</span>
@@ -276,10 +276,10 @@ export default function RegisterStorePage({ onRegistered, onBackToLogin }) {
                     {INDIA_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                <InputField label="PIN Code" name="pincode" placeholder="400001" required maxLength={6} />
-                <InputField label="GSTIN (Optional)" name="gstin" placeholder="27AABCU9603R1ZX" icon={FileText} maxLength={15} />
+                <InputField label="PIN Code" name="pincode" value={form.pincode} onChange={handleChange} placeholder="400001" required maxLength={6} />
+                <InputField label="GSTIN (Optional)" name="gstin" value={form.gstin} onChange={handleChange} placeholder="27AABCU9603R1ZX" icon={FileText} maxLength={15} />
                 <div className="sm:col-span-2">
-                  <InputField label="Drug License Number" name="drugLicenseNumber" placeholder="Drug license number" required icon={FileText} maxLength={50} />
+                  <InputField label="Drug License Number" name="drugLicenseNumber" value={form.drugLicenseNumber} onChange={handleChange} placeholder="Drug license number" required icon={FileText} maxLength={50} />
                 </div>
               </div>
 

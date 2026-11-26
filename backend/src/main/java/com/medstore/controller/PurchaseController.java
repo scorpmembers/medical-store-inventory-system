@@ -1,6 +1,7 @@
 package com.medstore.controller;
 
 import com.medstore.dto.ApiResponse;
+import com.medstore.dto.PurchaseResponse;
 import com.medstore.model.Purchase;
 import com.medstore.security.CustomUserDetails;
 import com.medstore.service.PurchaseService;
@@ -22,26 +23,28 @@ public class PurchaseController {
     private PurchaseService purchaseService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Purchase>>> getAllPurchases(
+    public ResponseEntity<ApiResponse<List<PurchaseResponse>>> getAllPurchases(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<Purchase> purchases = purchaseService.getAllPurchases(userDetails.getStoreId());
+        List<PurchaseResponse> purchases = purchaseService.getAllPurchases(userDetails.getStoreId()).stream()
+                .map(PurchaseResponse::from)
+                .toList();
         return ResponseEntity.ok(ApiResponse.success("Purchases retrieved", purchases));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Purchase>> getPurchaseById(
+    public ResponseEntity<ApiResponse<PurchaseResponse>> getPurchaseById(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Purchase purchase = purchaseService.getPurchaseById(id, userDetails.getStoreId());
-        return ResponseEntity.ok(ApiResponse.success("Purchase retrieved", purchase));
+        return ResponseEntity.ok(ApiResponse.success("Purchase retrieved", PurchaseResponse.from(purchase)));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Purchase>> createPurchase(
+    public ResponseEntity<ApiResponse<PurchaseResponse>> createPurchase(
             @RequestBody Purchase purchase,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Purchase created = purchaseService.createPurchase(userDetails.getStoreId(), purchase);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Purchase recorded and inventory updated", created));
+                .body(ApiResponse.success("Purchase recorded and inventory updated", PurchaseResponse.from(created)));
     }
 }

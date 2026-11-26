@@ -1,6 +1,7 @@
 package com.medstore.controller;
 
 import com.medstore.dto.ApiResponse;
+import com.medstore.dto.SupplierResponse;
 import com.medstore.model.Supplier;
 import com.medstore.security.CustomUserDetails;
 import com.medstore.service.SupplierService;
@@ -22,36 +23,38 @@ public class SupplierController {
     private SupplierService supplierService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Supplier>>> getAllSuppliers(
+    public ResponseEntity<ApiResponse<List<SupplierResponse>>> getAllSuppliers(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<Supplier> suppliers = supplierService.getAllSuppliers(userDetails.getStoreId());
+        List<SupplierResponse> suppliers = supplierService.getAllSuppliers(userDetails.getStoreId()).stream()
+                .map(SupplierResponse::from)
+                .toList();
         return ResponseEntity.ok(ApiResponse.success("Suppliers retrieved", suppliers));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Supplier>> getSupplierById(
+    public ResponseEntity<ApiResponse<SupplierResponse>> getSupplierById(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Supplier supplier = supplierService.getSupplierById(id, userDetails.getStoreId());
-        return ResponseEntity.ok(ApiResponse.success("Supplier retrieved", supplier));
+        return ResponseEntity.ok(ApiResponse.success("Supplier retrieved", SupplierResponse.from(supplier)));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Supplier>> createSupplier(
+    public ResponseEntity<ApiResponse<SupplierResponse>> createSupplier(
             @RequestBody Supplier supplier,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Supplier created = supplierService.createSupplier(userDetails.getStoreId(), supplier);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Supplier added successfully", created));
+                .body(ApiResponse.success("Supplier added successfully", SupplierResponse.from(created)));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<Supplier>> updateSupplier(
+    public ResponseEntity<ApiResponse<SupplierResponse>> updateSupplier(
             @PathVariable Long id,
             @RequestBody Supplier supplier,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Supplier updated = supplierService.updateSupplier(id, userDetails.getStoreId(), supplier);
-        return ResponseEntity.ok(ApiResponse.success("Supplier updated successfully", updated));
+        return ResponseEntity.ok(ApiResponse.success("Supplier updated successfully", SupplierResponse.from(updated)));
     }
 
     @DeleteMapping("/{id}")

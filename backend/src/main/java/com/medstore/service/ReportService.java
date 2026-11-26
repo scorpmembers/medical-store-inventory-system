@@ -1,7 +1,9 @@
 package com.medstore.service;
 
+import com.medstore.dto.DashboardResponse;
+import com.medstore.dto.PurchaseResponse;
+import com.medstore.dto.SaleResponse;
 import com.medstore.model.Batch;
-import com.medstore.model.Purchase;
 import com.medstore.model.Sale;
 import com.medstore.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.List;
 
 @Service
 public class ReportService {
@@ -31,7 +33,7 @@ public class ReportService {
     private SaleRepository saleRepository;
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getDashboardStats(Long storeId) {
+    public DashboardResponse getDashboardStats(Long storeId) {
         if (storeId == null) throw new IllegalArgumentException("Store ID is required.");
 
         LocalDate today = LocalDate.now();
@@ -70,26 +72,31 @@ public class ReportService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // Recent sales (limit to 5)
-        List<Sale> recentSales = allSales.stream().limit(5).toList();
+        List<SaleResponse> recentSales = allSales.stream()
+                .limit(5)
+                .map(SaleResponse::from)
+                .toList();
 
         // Recent purchases (limit to 5)
-        List<Purchase> recentPurchases = purchaseRepository.findByStoreIdOrderByPurchaseDateDesc(storeId).stream().limit(5).toList();
+        List<PurchaseResponse> recentPurchases = purchaseRepository.findByStoreIdOrderByPurchaseDateDesc(storeId).stream()
+                .limit(5)
+                .map(PurchaseResponse::from)
+                .toList();
 
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalMedicines", totalMedicines);
-        stats.put("totalStockUnits", totalStockUnits);
-        stats.put("lowStockCount", lowStockCount);
-        stats.put("nearExpiryCount", nearExpiryCount);
-        stats.put("expiredCount", expiredCount);
-        stats.put("totalSuppliers", totalSuppliers);
-        stats.put("totalPurchases", totalPurchases);
-        stats.put("totalSalesCount", totalSalesCount);
-        stats.put("todaySalesCount", todaySales.size());
-        stats.put("todayRevenue", todayRevenue);
-        stats.put("totalRevenue", totalRevenue);
-        stats.put("recentSales", recentSales);
-        stats.put("recentPurchases", recentPurchases);
-
-        return stats;
+        return new DashboardResponse(
+                totalMedicines,
+                totalStockUnits,
+                lowStockCount,
+                nearExpiryCount,
+                expiredCount,
+                totalSuppliers,
+                totalPurchases,
+                totalSalesCount,
+                todaySales.size(),
+                todayRevenue,
+                totalRevenue,
+                recentSales,
+                recentPurchases
+        );
     }
 }

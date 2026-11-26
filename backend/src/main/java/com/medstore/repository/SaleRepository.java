@@ -1,6 +1,7 @@
 package com.medstore.repository;
 
 import com.medstore.model.Sale;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,8 +12,10 @@ import java.util.Optional;
 @Repository
 public interface SaleRepository extends JpaRepository<Sale, Long> {
 
+    @EntityGraph(attributePaths = "items")
     List<Sale> findByStoreIdOrderBySaleDateDesc(Long storeId);
 
+    @EntityGraph(attributePaths = "items")
     Optional<Sale> findByIdAndStoreId(Long id, Long storeId);
 
     List<Sale> findByStoreIdAndSaleDate(Long storeId, LocalDate date);
