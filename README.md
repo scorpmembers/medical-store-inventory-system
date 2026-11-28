@@ -247,12 +247,3 @@ medical-store-inventory-system/
    - Click **"Deactivate"** or **"Add New Staff"** to demonstrate complete administrative control.
 
 ---
-
-## 🏆 Project Viva Highlights for Mentor & External Examiner
-
-1. **Why BCrypt over MD5 or SHA-256?**
-   - BCrypt includes a cryptographic salt and work-factor (10 rounds) that protects against rainbow table attacks and brute force.
-2. **Why JWT (JSON Web Tokens)?**
-   - Stateless authentication allows horizontal scaling without storing server-side session state in memory.
-3. **Defense in Depth:**
-   - Both frontend UI guards and backend Spring Security method-level annotations (`@PreAuthorize("hasAuthority('ROLE_ADMIN')")`) are implemented to ensure APIs cannot be bypassed by external tools like Postman or cURL.
